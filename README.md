@@ -74,6 +74,7 @@ game_test_framework/
 ### 2. Mock 架构设计
 被测系统的 `ExternalPayment` 是**模块级实例**：
 ```python
+from backend.app import ExternalPayment
 external_payment = ExternalPayment()  # 可被 pytest-mock 替换
 ```
 
