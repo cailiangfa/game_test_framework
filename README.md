@@ -1,5 +1,4 @@
 
-```markdown
 # 游戏商城自动化测试框架
 
 ![CI](https://github.com/cailiangfa/game_test_framework/actions/workflows/ci.yml/badge.svg)
@@ -220,14 +219,3 @@ A：Locust 模拟真实用户行为，权重设计：查金币(3) > 购买(2) > 
 License
 MIT
 
-```
-
----
-
-## 重要提醒
-
-**README.md 第一行徽章里的 `你的GitHub用户名` 必须替换**，例如：
-
-```markdown
-![CI](https://github.com/zhangsan123/game_test_framework/actions/workflows/ci.yml/badge.svg)
-```
