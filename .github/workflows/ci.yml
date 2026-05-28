@@ -11,27 +11,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
-          
+
       - name: Install dependencies
         run: pip install -r requirements.txt
-        
+
       - name: Start backend
         run: |
           cd backend
           python app.py &
           sleep 3
-          
+
       - name: Run API & Unit Tests
         run: pytest tests/ --ignore=tests/test_ui.py -v --alluredir=allure-results/api
         env:
           BASE_URL: http://localhost:5000
-          
+
       - name: Upload API results
         uses: actions/upload-artifact@v4
         if: always()
@@ -43,30 +43,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
-          
+
       - name: Install dependencies & Playwright browsers
         run: |
           pip install -r requirements.txt
           playwright install
           playwright install-deps
-          
+
       - name: Start backend
         run: |
           cd backend
           python app.py &
           sleep 3
-          
+
       - name: Run UI Tests
         run: pytest tests/test_ui.py -v --alluredir=allure-results/ui
         env:
           BASE_URL: http://localhost:5000
-          
+
       - name: Upload UI results
         uses: actions/upload-artifact@v4
         if: always()
@@ -75,7 +75,7 @@ jobs:
           path: allure-results/ui
 
   generate-report:
-    needs: [api-tests, ui-tests]
+    needs: [ api-tests, ui-tests ]
     if: always()
     runs-on: ubuntu-latest
     permissions:
@@ -88,23 +88,34 @@ jobs:
         with:
           name: api-results
           path: allure-results/api
-          
+
       - name: Download UI results
         uses: actions/download-artifact@v4
         with:
           name: ui-results
           path: allure-results/ui
-          
+
+      - name: Merge Allure Results
+        run: |
+          mkdir -p allure-results/merged
+          # 把 api 和 ui 的结果平铺合并到 allure-results/merged/
+          find allure-results/api -name "*.json" -exec cp {} allure-results/merged/ \;
+          find allure-results/ui -name "*.json" -exec cp {} allure-results/merged/ \;
+          # 如果有 environment.properties 也复制
+          find allure-results/api -name "environment.properties" -exec cp {} allure-results/merged/ \;
+          find allure-results/ui -name "environment.properties" -exec cp {} allure-results/merged/ \;
+          ls -la allure-results/merged/
+
       - name: Install Allure
         run: |
           wget -q https://github.com/allure-framework/allure2/releases/download/2.27.0/allure-2.27.0.tgz
           tar -xzf allure-2.27.0.tgz
           sudo mv allure-2.27.0 /opt/allure
           sudo ln -s /opt/allure/bin/allure /usr/local/bin/allure
-          
+
       - name: Generate Allure Report
-        run: allure generate allure-results -o allure-report --clean
-        
+        run: allure generate allure-results/merged -o allure-report --clean
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
