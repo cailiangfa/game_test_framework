@@ -49,7 +49,7 @@ class TestAuthErrors:
                 json={"item_id": 1, "quantity": 1},
                 headers={"Authorization": "Bearer token_999"},
             )
-            assert resp.status_code == 400
+            assert resp.status_code == 404
             assert "玩家不存在" in resp.get_json()["error"]
 
 

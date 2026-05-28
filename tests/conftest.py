@@ -1,152 +1,316 @@
+"""
+企业级 Pytest Fixture 体系 - CI 修复版
+修复点：
+1. db_check 显式转 dict，避免 sqlite3.Row 在 CI 中的兼容问题
+2. _seed_database 防御性补全 players/items，防止数据缺失
+3. 强制 GAME_DB 环境变量，避免路径漂移
+"""
+
+from __future__ import annotations
+
+import logging
 import os
+import socket
 import sys
-import pytest
+import threading
+import time
 from pathlib import Path
+from typing import TYPE_CHECKING, Any, Callable, Generator
 
-# ===== 路径配置 =====
+import allure
+import pytest
+import sqlite3
+from playwright.sync_api import Browser, BrowserContext, Page, sync_playwright
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from werkzeug.serving import make_server
+
+if TYPE_CHECKING:
+    from flask import Flask
+    from flask.testing import FlaskClient
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-TEST_DB_PATH = str(PROJECT_ROOT / 'tests' / 'test.db')
-
-# 必须在导入 backend 之前设置，确保它连的是测试库
-os.environ['GAME_DB'] = TEST_DB_PATH
-
 sys.path.insert(0, str(PROJECT_ROOT))
-import backend.app as backend
+
+# 强制绑定测试数据库路径，防止被 .env 或系统环境覆盖
+TEST_DB_PATH = str(PROJECT_ROOT / "tests" / "test.db")
+os.environ["GAME_DB"] = TEST_DB_PATH
+
+import backend.app as backend_module  # noqa: E402
 
 
-# ===== Session 级：建表 + 种子数据（只跑一次）=====
+# ============================================================================
+# 配置中心
+# ============================================================================
+class TestConfig(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+    game_db: str = TEST_DB_PATH
+    host: str = "127.0.0.1"
+    headless: bool = True
+    browser_type: str = "chromium"
+
+
+settings = TestConfig()
+
+
+# ============================================================================
+# Session 级：应用实例
+# ============================================================================
 @pytest.fixture(scope="session")
-def app():
-    backend.app.config['TESTING'] = True
-    # 整个测试会话只初始化一次数据库（建表+种子数据）
-    backend.init_db()
-    return backend.app
+def app() -> Generator[Flask, None, None]:
+    app_instance = backend_module.app
+    app_instance.config.update(
+        {
+            "TESTING": True,
+            "DATABASE": settings.game_db,
+        }
+    )
+    backend_module.init_db()
+    allure.attach(
+        f"Database: {settings.game_db}\nTesting Mode: True",
+        name="Test Environment",
+        attachment_type=allure.attachment_type.TEXT,
+    )
+    yield app_instance
 
 
-# ===== Function 级：重置业务数据（不删表，走 Flask 通道）=====
+# ============================================================================
+# Function 级：数据库重置
+# ============================================================================
+def _seed_database(db: sqlite3.Connection) -> None:
+    """重置数据库到标准种子状态"""
+    db.execute("DELETE FROM orders")
+    db.execute("DELETE FROM backpack")
+    db.execute("UPDATE players SET gold = 1000")
+
+    # 防御性：确保道具存在
+    db.execute(
+        "INSERT OR IGNORE INTO items (id, name, price) VALUES (?, ?, ?)",
+        (1, "生命药水", 100),
+    )
+    db.execute(
+        "INSERT OR IGNORE INTO items (id, name, price) VALUES (?, ?, ?)",
+        (2, "魔法药水", 200),
+    )
+
+    # 防御性：确保 5 个测试玩家存在（init_db 理论上已创建，这里兜底）
+    for i in range(1, 6):
+        db.execute(
+            "INSERT OR IGNORE INTO players (id, username, password, gold) VALUES (?, ?, ?, ?)",
+            (i, f"player{i}", "123", 1000),
+        )
+    db.commit()
+
+
 @pytest.fixture(autouse=True)
-def _reset_data(app):
-    """
-    每个测试函数执行前，重置业务数据到初始状态。
-    不 DROP 表，只 DELETE 数据 + 重置种子数据。
-    走 Flask 的 app_context，保证和接口用同一个连接。
-    """
+def _reset_db(app: Flask) -> Generator[None, None, None]:
+    """每个测试函数执行前重置数据库"""
     with app.app_context():
-        db = backend.get_db()
-        # 1. 清空业务数据（按外键依赖顺序，子表先清）
-        db.execute("DELETE FROM orders")
-        db.execute("DELETE FROM backpack")
-        # 2. 重置玩家数据（不是删了再插，而是 UPDATE 回初始值）
-        db.execute("UPDATE players SET gold = 1000 WHERE id = 1")
-        # 3. 确保种子道具数据完整（防止有人误删）
-        #    用 INSERT OR IGNORE 保证已有数据不会被重复插入
-        db.execute("INSERT OR IGNORE INTO items (id, name, price) VALUES (1, '生命药水', 100)")
-        db.execute("INSERT OR IGNORE INTO items (id, name, price) VALUES (2, '魔法药水', 200)")
-        db.commit()
+        db = backend_module.get_db()
+        db.row_factory = sqlite3.Row
+        _seed_database(db)
     yield
-    # yield 之后无需额外清理，下次 _reset_data 会再次重置
 
 
-# ===== Session 级清理：测试结束后删除临时数据库文件 =====
+# ============================================================================
+# Session 级清理
+# ============================================================================
 @pytest.fixture(scope="session", autouse=True)
-def _cleanup_db():
+def _cleanup_session() -> Generator[None, None, None]:
     yield
     try:
-        if os.path.exists(TEST_DB_PATH):
-            os.remove(TEST_DB_PATH)
-    except OSError:
-        pass
+        if os.path.exists(settings.game_db):
+            os.remove(settings.game_db)
+            logging.info("Cleaned up test database: %s", settings.game_db)
+    except OSError as exc:
+        logging.warning("Failed to remove test db: %s", exc)
 
 
-# ===== 数据库直查（走 Flask 通道，保证数据一致）=====
+# ============================================================================
+# 数据库直查 Fixture（修复：显式转 dict）
+# ============================================================================
 @pytest.fixture
-def db_check(app):
-    def _check(sql, params=()):
+def db_check(app: Flask) -> Callable[..., Any | None]:
+    def _check(sql: str, params: tuple[Any, ...] = ()) -> Any | None:
         with app.app_context():
-            db = backend.get_db()
+            db = backend_module.get_db()
+            db.row_factory = sqlite3.Row
             cur = db.execute(sql, params)
-            return cur.fetchone()
+            row = cur.fetchone()
+            # 显式转 dict，避免 CI 中 sqlite3.Row 行为不一致
+            return dict(row) if row else None
     return _check
 
 
-# ===== 数据库写入（用于构造特殊测试数据）=====
 @pytest.fixture
-def db_exec(app):
-    def _exec(sql, params=()):
+def db_exec(app: Flask) -> Callable[..., None]:
+    def _exec(sql: str, params: tuple[Any, ...] = ()) -> None:
         with app.app_context():
-            db = backend.get_db()
+            db = backend_module.get_db()
             db.execute(sql, params)
             db.commit()
     return _exec
 
 
-# ===== Flask 测试客户端 =====
+# ============================================================================
+# Flask 测试客户端
+# ============================================================================
 @pytest.fixture
-def client(app):
-    with app.test_client() as client:
-        yield client
+def client(app: Flask) -> Generator[Any, None, None]:
+    with app.test_client() as test_client:
+        yield test_client
 
 
-# ===== 登录态 headers =====
+# ============================================================================
+# 登录态 headers
+# ============================================================================
 @pytest.fixture
-def logged_headers(client):
-    resp = client.post('/api/login', json={'username': 'player1', 'password': '123'})
+def logged_headers(client: Any) -> dict[str, str]:
+    resp = client.post(
+        "/api/login",
+        json={"username": "player1", "password": "123"},
+    )
     assert resp.status_code == 200, f"登录失败: {resp.get_json()}"
-    token = resp.get_json()['token']
-    return {'Authorization': f'Bearer {token}'}
+    token: str = resp.get_json()["token"]
+    return {"Authorization": f"Bearer {token}"}
 
 
-# ===== 快捷查金币（工厂模式）=====
 @pytest.fixture
-def get_gold(client, logged_headers):
-    def _get():
-        resp = client.get('/api/gold', headers=logged_headers)
-        return resp.get_json()['gold']
+def logged_headers_player2(client: Any) -> dict[str, str]:
+    resp = client.post(
+        "/api/login",
+        json={"username": "player2", "password": "123"},
+    )
+    assert resp.status_code == 200
+    token: str = resp.get_json()["token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+# ============================================================================
+# 快捷查金币
+# ============================================================================
+@pytest.fixture
+def get_gold(client: Any, logged_headers: dict[str, str]) -> Callable[[], int]:
+    def _get() -> int:
+        resp = client.get("/api/gold", headers=logged_headers)
+        data = resp.get_json()
+        return data.get("gold", 0) if data else 0
     return _get
 
-# ===== Playwright 浏览器 Fixture =====
-import threading
-import socket
-import time
-from playwright.sync_api import sync_playwright
 
-
-def _get_free_port():
-    """获取一个空闲端口"""
+# ============================================================================
+# Playwright 浏览器 Fixture
+# ============================================================================
+def _get_free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(('', 0))
+        s.bind(("", 0))
         return s.getsockname()[1]
 
 
-@pytest.fixture(scope="session")
-def base_url(app):
-    """启动真实的 Flask 服务器，供 Playwright 通过 HTTP 访问"""
-    from werkzeug.serving import make_server
+def _wait_for_server(url: str, timeout: float = 10.0, interval: float = 0.1) -> None:
+    import urllib.error
+    import urllib.request
 
+    start = time.time()
+    while time.time() - start < timeout:
+        try:
+            urllib.request.urlopen(url, timeout=1)
+            return
+        except urllib.error.HTTPError:
+            return
+        except urllib.error.URLError:
+            time.sleep(interval)
+    raise RuntimeError(f"Server failed to start within {timeout}s: {url}")
+
+
+@pytest.fixture(scope="session")
+def base_url(app: Flask) -> Generator[str, None, None]:
     port = _get_free_port()
-    server = make_server("127.0.0.1", port, app)
+    server = make_server(settings.host, port, app)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    time.sleep(0.3)  # 等待服务器就绪
 
-    yield f"http://127.0.0.1:{port}"
+    url = f"http://{settings.host}:{port}"
+    _wait_for_server(url)
+
+    yield url
 
     server.shutdown()
 
 
 @pytest.fixture(scope="session")
-def browser():
-    """整个测试会话只启动一次浏览器"""
+def browser() -> Generator[Browser, None, None]:
     with sync_playwright() as p:
-        b = p.chromium.launch(headless=True)
-        yield b
-        b.close()
+        launcher = getattr(p, settings.browser_type)
+        browser_instance = launcher.launch(headless=settings.headless)
+        yield browser_instance
+        browser_instance.close()
+
+
+# ============================================================================
+# pytest hook：失败自动截图
+# ============================================================================
+@pytest.hookimpl(tryfirst=True, hookwrapper=True)
+def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[Any]) -> Generator[None, Any, None]:
+    outcome = yield
+    rep = outcome.get_result()
+    setattr(item, f"rep_{rep.when}", rep)
 
 
 @pytest.fixture
-def page(browser, base_url):
-    """每个测试用例独立页面，保证隔离"""
-    context = browser.new_context()
+def page(browser: Browser, base_url: str, request: pytest.FixtureRequest) -> Generator[Page, None, None]:
+    context = browser.new_context(viewport={"width": 1280, "height": 720})
     pg = context.new_page()
     yield pg
+
+    failed = False
+    if hasattr(request.node, "rep_call"):
+        failed = request.node.rep_call.failed
+
+    if failed:
+        try:
+            allure.attach(
+                pg.screenshot(full_page=True),
+                name="failure_screenshot",
+                attachment_type=allure.attachment_type.PNG,
+            )
+        except Exception:
+            pass
+
     context.close()
+
+
+# ============================================================================
+# Allure 环境信息
+# ============================================================================
+def pytest_sessionstart(session: pytest.Session) -> None:
+    env_file = Path(settings.game_db).parent / "environment.properties"
+    env_file.parent.mkdir(parents=True, exist_ok=True)
+    env_file.write_text(
+        f"GameDB={settings.game_db}\n"
+        f"Browser={settings.browser_type}\n"
+        f"Headless={settings.headless}\n",
+        encoding="utf-8",
+    )
+
+
+# ============================================================================
+# API / Page Object Fixture
+# ============================================================================
+from tests.api.shop_api import ShopAPI  # noqa: E402
+
+
+@pytest.fixture
+def shop_api(client: Any, logged_headers: dict[str, str]) -> ShopAPI:
+    return ShopAPI(client, logged_headers)
+
+
+from tests.pages.shop_page import ShopPage  # noqa: E402
+
+
+@pytest.fixture
+def shop_page(page: Page, base_url: str) -> ShopPage:
+    return ShopPage(page, base_url)
