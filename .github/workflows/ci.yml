@@ -1,28 +1,112 @@
-name: CI
+name: CI - Test & Allure Report
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [optimized-v2, main]
+  pull_request:
+    branches: [optimized-v2, main]
 
 jobs:
-  test:
+  api-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
+      
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-
+          python-version: '3.11'
+          cache: 'pip'
+          
       - name: Install dependencies
+        run: pip install -r requirements.txt
+        
+      - name: Start backend
+        run: |
+          cd backend
+          python app.py &
+          sleep 3
+          
+      - name: Run API & Unit Tests
+        run: pytest tests/ --ignore=tests/test_ui.py -v --alluredir=allure-results/api
+        env:
+          BASE_URL: http://localhost:5000
+          
+      - name: Upload API results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-results
+          path: allure-results/api
+
+  ui-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          
+      - name: Install dependencies & Playwright browsers
         run: |
           pip install -r requirements.txt
-          playwright install chromium
-
-      - name: Run tests
-        run: pytest tests/ -v --alluredir=allure-results
-
-      - name: Upload Allure results
+          playwright install
+          playwright install-deps
+          
+      - name: Start backend
+        run: |
+          cd backend
+          python app.py &
+          sleep 3
+          
+      - name: Run UI Tests
+        run: pytest tests/test_ui.py -v --alluredir=allure-results/ui
+        env:
+          BASE_URL: http://localhost:5000
+          
+      - name: Upload UI results
         uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: allure-results
-          path: allure-results
+          name: ui-results
+          path: allure-results/ui
+
+  generate-report:
+    needs: [api-tests, ui-tests]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    steps:
+      - name: Download API results
+        uses: actions/download-artifact@v4
+        with:
+          name: api-results
+          path: allure-results/api
+          
+      - name: Download UI results
+        uses: actions/download-artifact@v4
+        with:
+          name: ui-results
+          path: allure-results/ui
+          
+      - name: Install Allure
+        run: |
+          wget -q https://github.com/allure-framework/allure2/releases/download/2.27.0/allure-2.27.0.tgz
+          tar -xzf allure-2.27.0.tgz
+          sudo mv allure-2.27.0 /opt/allure
+          sudo ln -s /opt/allure/bin/allure /usr/local/bin/allure
+          
+      - name: Generate Allure Report
+        run: allure generate allure-results -o allure-report --clean
+        
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./allure-report
