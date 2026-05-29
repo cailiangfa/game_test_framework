@@ -1,0 +1,6 @@
+{
+  "status_code": 400,
+  "data": {
+    "error": "缺少 item_id"
+  }
+}

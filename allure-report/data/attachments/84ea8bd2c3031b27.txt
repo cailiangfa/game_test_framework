@@ -1,0 +1,14 @@
+{"timestamp": "2026-05-29 23:46:15,379", "level": "INFO", "logger": "game_shop", "message": "Database initialized", "module": "app", "func": "init_db"}
+{"timestamp": "2026-05-29 23:46:15,438", "level": "INFO", "logger": "game_shop", "message": "Request started", "module": "app", "func": "log_request"}
+{"timestamp": "2026-05-29 23:46:15,439", "level": "INFO", "logger": "game_shop", "message": "Login success", "module": "app", "func": "login"}
+{"timestamp": "2026-05-29 23:46:15,439", "level": "INFO", "logger": "game_shop", "message": "Request completed", "module": "app", "func": "log_response"}
+{"timestamp": "2026-05-29 23:46:15,443", "level": "INFO", "logger": "game_shop", "message": "Request started", "module": "app", "func": "log_request"}
+{"timestamp": "2026-05-29 23:46:15,444", "level": "INFO", "logger": "game_shop", "message": "Request completed", "module": "app", "func": "log_response"}
+{"timestamp": "2026-05-29 23:46:15,446", "level": "INFO", "logger": "game_shop", "message": "Request started", "module": "app", "func": "log_request"}
+{"timestamp": "2026-05-29 23:46:15,446", "level": "INFO", "logger": "game_shop", "message": "Payment verify", "module": "app", "func": "verify"}
+{"timestamp": "2026-05-29 23:46:15,447", "level": "INFO", "logger": "game_shop", "message": "Item purchased", "module": "app", "func": "buy_item"}
+{"timestamp": "2026-05-29 23:46:15,448", "level": "INFO", "logger": "game_shop", "message": "Request completed", "module": "app", "func": "log_response"}
+{"timestamp": "2026-05-29 23:46:15,449", "level": "INFO", "logger": "game_shop", "message": "Request started", "module": "app", "func": "log_request"}
+{"timestamp": "2026-05-29 23:46:15,449", "level": "INFO", "logger": "game_shop", "message": "Request completed", "module": "app", "func": "log_response"}
+{"timestamp": "2026-05-29 23:46:15,452", "level": "INFO", "logger": "game_shop", "message": "Request started", "module": "app", "func": "log_request"}
+{"timestamp": "2026-05-29 23:46:15,452", "level": "INFO", "logger": "game_shop", "message": "Request completed", "module": "app", "func": "log_response"}

@@ -1,0 +1,2 @@
+Database: E:/game_test_framework/tests/test.db
+Env: local

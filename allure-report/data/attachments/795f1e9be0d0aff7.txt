@@ -1,0 +1,11 @@
+{"timestamp": "2026-05-29 23:46:15,878", "level": "INFO", "logger": "game_shop", "message": "Request started", "module": "app", "func": "log_request"}
+{"timestamp": "2026-05-29 23:46:15,880", "level": "INFO", "logger": "game_shop", "message": "Login success", "module": "app", "func": "login"}
+{"timestamp": "2026-05-29 23:46:15,880", "level": "INFO", "logger": "game_shop", "message": "Request completed", "module": "app", "func": "log_response"}
+{"timestamp": "2026-05-29 23:46:15,881", "level": "INFO", "logger": "game_shop", "message": "Request started", "module": "app", "func": "log_request"}
+{"timestamp": "2026-05-29 23:46:15,881", "level": "INFO", "logger": "game_shop", "message": "Request completed", "module": "app", "func": "log_response"}
+{"timestamp": "2026-05-29 23:46:15,884", "level": "INFO", "logger": "game_shop", "message": "Request started", "module": "app", "func": "log_request"}
+{"timestamp": "2026-05-29 23:46:15,885", "level": "INFO", "logger": "game_shop", "message": "Payment verify", "module": "app", "func": "verify"}
+{"timestamp": "2026-05-29 23:46:15,886", "level": "INFO", "logger": "game_shop", "message": "Item purchased", "module": "app", "func": "buy_item"}
+{"timestamp": "2026-05-29 23:46:15,886", "level": "INFO", "logger": "game_shop", "message": "Request completed", "module": "app", "func": "log_response"}
+{"timestamp": "2026-05-29 23:46:15,886", "level": "INFO", "logger": "game_shop", "message": "Request started", "module": "app", "func": "log_request"}
+{"timestamp": "2026-05-29 23:46:15,886", "level": "INFO", "logger": "game_shop", "message": "Request completed", "module": "app", "func": "log_response"}

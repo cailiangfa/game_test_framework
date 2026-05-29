@@ -1,0 +1,11 @@
+{
+  "method": "POST",
+  "path": "/api/buy",
+  "headers": {
+    "Authorization": "***"
+  },
+  "body": {
+    "item_id": 1,
+    "quantity": -5
+  }
+}

@@ -1,0 +1,47 @@
+"DESCRIPTION","DURATION IN MS","NAME","PARENT SUITE","START TIME","STATUS","STOP TIME","SUB SUITE","SUITE","TEST CLASS","TEST METHOD"
+"","2","test_buy_player_not_exist","tests.api","2026-05-29","passed","2026-05-29","TestAuthErrors","test_shop_errors","",""
+"","12","支付验证失败：返回 400，数据绝对不变","tests.api","2026-05-29","passed","2026-05-29","TestMockPayment","test_mock","",""
+"从 JSON 加载数据，验证购买功能","13","buy_1x3: 购买3瓶生命药水","tests.api","2026-05-29","passed","2026-05-29","TestBuyDDT","test_buy_ddt","",""
+"","1","test_buy_without_token","tests.api","2026-05-29","passed","2026-05-29","TestAuthErrors","test_shop_errors","",""
+"","6","test_buy_negative_quantity","tests.api","2026-05-29","passed","2026-05-29","TestValidationErrors","test_shop_errors","",""
+"","7","test_buy_zero_quantity","tests.api","2026-05-29","passed","2026-05-29","TestValidationErrors","test_shop_errors","",""
+"","1","test_buy_empty_body","tests.api","2026-05-29","passed","2026-05-29","TestValidationErrors","test_shop_errors","",""
+"零值和负值：验证参数校验","3","购买数量零值/负值应被拒绝","tests.api","2026-05-29","passed","2026-05-29","TestNumericSafety","test_overflow","",""
+"
+        极限场景：金币刚好够买1次，并发2次请求
+        验证后端是否有行级锁保护，防止重复扣款
+        ","320","竞态购买：100金币玩家同时买2次，只能成功1次","tests.concurrency","2026-05-29","passed","2026-05-29","TestRaceCondition","test_concurrency","",""
+"","6","test_buy_insufficient_gold","tests.api","2026-05-29","passed","2026-05-29","TestBusinessErrors","test_shop_errors","",""
+"使用数据工厂创建独立用户，验证精确边界（金币刚好花完）","8","test_buy_with_factory_user","tests.api","2026-05-29","passed","2026-05-29","TestBuyItem","test_shop","",""
+"","118","商城页面正常打开，显示标题和金币","tests.ui","2026-05-29","passed","2026-05-29","TestShopPageLoad","test_ui","",""
+"
+        极限场景：如果后端用 int64 存金币，接近最大值时加钱不应溢出为负
+        这是一个概念测试，展示你对数值安全的关注
+        ","0","玩家金币 int64 最大值边界","tests.api","2026-05-29","skipped","2026-05-29","TestNumericSafety","test_overflow","",""
+"出售成功：金币增加，背包减少，订单生成","10","test_sell_success","tests.api","2026-05-29","passed","2026-05-29","TestSellItem","test_shop","",""
+"
+        场景：玩家有 5 瓶生命药水，同时发起 10 次出售请求
+        期望：最多 5 次成功
+        ","562","并发出售：验证不出售超过拥有的数量","tests.concurrency","2026-05-29","passed","2026-05-29","TestRaceCondition","test_concurrency","",""
+"非法道具ID","2","item_id 负值/零值应被拒绝","tests.api","2026-05-29","passed","2026-05-29","TestNumericSafety","test_overflow","",""
+"极大数量：验证后端不会计算溢出或挂掉","4","购买数量极大值（quantity=999999）应被拒绝","tests.api","2026-05-29","passed","2026-05-29","TestNumericSafety","test_overflow","",""
+"","1","test_sell_insufficient_items","tests.api","2026-05-29","passed","2026-05-29","TestBusinessErrors","test_shop_errors","",""
+"","224","购买 1 瓶生命药水，金币从 1000 变为 900","tests.ui","2026-05-29","passed","2026-05-29","TestShopBuyFlow","test_ui","",""
+"","2","test_buy_invalid_token_format","tests.api","2026-05-29","passed","2026-05-29","TestAuthErrors","test_shop_errors","",""
+"","8","test_buy_missing_item_id","tests.api","2026-05-29","passed","2026-05-29","TestValidationErrors","test_shop_errors","",""
+"","1","test_sell_without_token","tests.api","2026-05-29","passed","2026-05-29","TestValidationErrors","test_shop_errors","",""
+"","6","test_sell_negative_quantity","tests.api","2026-05-29","passed","2026-05-29","TestValidationErrors","test_shop_errors","",""
+"","7","test_buy_float_quantity","tests.api","2026-05-29","passed","2026-05-29","TestValidationErrors","test_shop_errors","",""
+"从 JSON 加载数据，验证购买功能","13","buy_2x5: 购买5瓶魔法药水（刚好花光金币）","tests.api","2026-05-29","passed","2026-05-29","TestBuyDDT","test_buy_ddt","",""
+"","1","test_sell_item_not_in_backpack","tests.api","2026-05-29","passed","2026-05-29","TestBusinessErrors","test_shop_errors","",""
+"购买道具：接口 + 数据库双重断言","9","test_buy_success","tests.api","2026-05-29","passed","2026-05-29","TestBuyItem","test_shop","",""
+"
+        场景：玩家有 1000 金币，同时发起 10 次购买请求（每次买 1 瓶生命药水，100 金币）
+        期望：最终金币 + 已花费 = 1000，不能出现负余额
+        ","585","并发购买：10 人同时购买，验证不超扣","tests.concurrency","2026-05-29","passed","2026-05-29","TestRaceCondition","test_concurrency","",""
+"从 JSON 加载数据，验证购买功能","14","buy_1x1: 购买1瓶生命药水","tests.api","2026-05-29","passed","2026-05-29","TestBuyDDT","test_buy_ddt","",""
+"","5","test_buy_item_not_exist","tests.api","2026-05-29","passed","2026-05-29","TestBusinessErrors","test_shop_errors","",""
+"从 JSON 加载数据，验证购买功能","14","buy_2x2: 购买2瓶魔法药水","tests.api","2026-05-29","passed","2026-05-29","TestBuyDDT","test_buy_ddt","",""
+"","14","支付服务超时：返回 500，数据绝对不变","tests.api","2026-05-29","passed","2026-05-29","TestMockPayment","test_mock","",""
+"","159","拦截购买接口返回余额不足，页面正确显示错误提示","tests.ui","2026-05-29","passed","2026-05-29","TestShopErrorHandling","test_ui","",""
+"","6","支付验证成功：购买正常完成，验证调用参数正确","tests.api","2026-05-29","passed","2026-05-29","TestMockPayment","test_mock","",""

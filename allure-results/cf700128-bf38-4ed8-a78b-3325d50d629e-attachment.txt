@@ -1,0 +1,35 @@
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:335 Item sold
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m werkzeug:_internal.py:97 127.0.0.1 - - [29/May/2026 23:46:17] "POST /api/sell HTTP/1.1" 200 -
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:335 Item sold
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m werkzeug:_internal.py:97 127.0.0.1 - - [29/May/2026 23:46:17] "POST /api/sell HTTP/1.1" 200 -
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:335 Item sold
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m werkzeug:_internal.py:97 127.0.0.1 - - [29/May/2026 23:46:17] "POST /api/sell HTTP/1.1" 200 -
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:335 Item sold
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m werkzeug:_internal.py:97 127.0.0.1 - - [29/May/2026 23:46:17] "POST /api/sell HTTP/1.1" 200 -
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:335 Item sold
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m werkzeug:_internal.py:97 127.0.0.1 - - [29/May/2026 23:46:17] "POST /api/sell HTTP/1.1" 200 -
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m werkzeug:_internal.py:97 127.0.0.1 - - [29/May/2026 23:46:17] "[31m[1mPOST /api/sell HTTP/1.1[0m" 400 -
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m werkzeug:_internal.py:97 127.0.0.1 - - [29/May/2026 23:46:17] "[31m[1mPOST /api/sell HTTP/1.1[0m" 400 -
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m werkzeug:_internal.py:97 127.0.0.1 - - [29/May/2026 23:46:17] "[31m[1mPOST /api/sell HTTP/1.1[0m" 400 -
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m werkzeug:_internal.py:97 127.0.0.1 - - [29/May/2026 23:46:17] "[31m[1mPOST /api/sell HTTP/1.1[0m" 400 -
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m werkzeug:_internal.py:97 127.0.0.1 - - [29/May/2026 23:46:17] "[31m[1mPOST /api/sell HTTP/1.1[0m" 400 -

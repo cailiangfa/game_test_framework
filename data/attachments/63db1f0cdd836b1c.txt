@@ -1,0 +1,3 @@
+[32mINFO    [0m game_shop:app.py:204 Request started
+[33mWARNING [0m game_shop:app.py:175 Auth failed: player not found
+[32mINFO    [0m game_shop:app.py:217 Request completed

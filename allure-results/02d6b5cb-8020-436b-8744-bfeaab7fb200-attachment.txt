@@ -1,0 +1,15 @@
+[32mINFO    [0m game_shop:app.py:154 Database initialized
+[32mINFO    [0m werkzeug:_internal.py:97 127.0.0.1 - - [29/May/2026 23:46:15] "GET / HTTP/1.1" 200 -
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:407 Login success
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:54 Payment verify
+[32mINFO    [0m game_shop:app.py:291 Item purchased
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:217 Request completed

@@ -1,0 +1,6 @@
+{
+  "passed": false,
+  "total_requests": 10,
+  "error_rate_pct": 100.0,
+  "p95_ms": 2000.0
+}

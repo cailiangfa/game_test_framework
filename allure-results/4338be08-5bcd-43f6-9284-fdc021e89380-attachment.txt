@@ -1,0 +1,9 @@
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:407 Login success
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:217 Request completed

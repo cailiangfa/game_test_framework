@@ -1,0 +1,50 @@
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:54 Payment verify
+[32mINFO    [0m game_shop:app.py:291 Item purchased
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m werkzeug:_internal.py:97 127.0.0.1 - - [29/May/2026 23:46:16] "POST /api/buy HTTP/1.1" 200 -
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:54 Payment verify
+[32mINFO    [0m game_shop:app.py:291 Item purchased
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m werkzeug:_internal.py:97 127.0.0.1 - - [29/May/2026 23:46:16] "POST /api/buy HTTP/1.1" 200 -
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:54 Payment verify
+[32mINFO    [0m game_shop:app.py:291 Item purchased
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m werkzeug:_internal.py:97 127.0.0.1 - - [29/May/2026 23:46:16] "POST /api/buy HTTP/1.1" 200 -
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:54 Payment verify
+[32mINFO    [0m game_shop:app.py:291 Item purchased
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m werkzeug:_internal.py:97 127.0.0.1 - - [29/May/2026 23:46:16] "POST /api/buy HTTP/1.1" 200 -
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:54 Payment verify
+[32mINFO    [0m game_shop:app.py:291 Item purchased
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m werkzeug:_internal.py:97 127.0.0.1 - - [29/May/2026 23:46:16] "POST /api/buy HTTP/1.1" 200 -
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:54 Payment verify
+[32mINFO    [0m game_shop:app.py:291 Item purchased
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m werkzeug:_internal.py:97 127.0.0.1 - - [29/May/2026 23:46:16] "POST /api/buy HTTP/1.1" 200 -
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:54 Payment verify
+[32mINFO    [0m game_shop:app.py:291 Item purchased
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m werkzeug:_internal.py:97 127.0.0.1 - - [29/May/2026 23:46:16] "POST /api/buy HTTP/1.1" 200 -
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:54 Payment verify
+[32mINFO    [0m game_shop:app.py:291 Item purchased
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m werkzeug:_internal.py:97 127.0.0.1 - - [29/May/2026 23:46:16] "POST /api/buy HTTP/1.1" 200 -
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:54 Payment verify
+[32mINFO    [0m game_shop:app.py:291 Item purchased
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m werkzeug:_internal.py:97 127.0.0.1 - - [29/May/2026 23:46:16] "POST /api/buy HTTP/1.1" 200 -
+[32mINFO    [0m game_shop:app.py:204 Request started
+[32mINFO    [0m game_shop:app.py:54 Payment verify
+[32mINFO    [0m game_shop:app.py:291 Item purchased
+[32mINFO    [0m game_shop:app.py:217 Request completed
+[32mINFO    [0m werkzeug:_internal.py:97 127.0.0.1 - - [29/May/2026 23:46:16] "POST /api/buy HTTP/1.1" 200 -
