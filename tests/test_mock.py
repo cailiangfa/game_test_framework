@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import allure
 from pytest_mock import MockerFixture
+
 import backend.app as backend_module
 from tests.api.shop_api import ShopAPI
 from tests.utils.assertions import assert_data_unchanged

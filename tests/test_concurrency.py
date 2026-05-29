@@ -2,10 +2,12 @@
 并发竞态测试：验证购买/出售在并发场景下的数据一致性
 这是游戏测试的核心关注点：超卖、超扣、重复支付
 """
+
 from __future__ import annotations
 
 import threading
 import time
+
 import allure
 import requests
 

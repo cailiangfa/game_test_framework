@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import allure
+
 from tests.api.shop_api import ShopAPI
 from tests.utils.assertions import (assert_backpack_unchanged,
                                     assert_data_unchanged)

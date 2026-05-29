@@ -1,7 +1,7 @@
 import allure
 import pytest
 
-from tests.utils.factories import (create_player, give_item_to_player)
+from tests.utils.factories import create_player, give_item_to_player
 
 
 class TestBuyItem:
