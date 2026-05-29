@@ -31,3 +31,6 @@ game_test_framework/
 ├── pages/            # Page Object 层
 ├── docs/             # 架构图、文档
 └── ci/               # GitHub Actions 配置
+
+## 在线报告
+[查看最新 Allure 报告](https://cailiangfa.github.io/game_test_framework/)
