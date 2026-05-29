@@ -51,9 +51,18 @@ class TestConfig(BaseSettings):
     host: str = "127.0.0.1"
     headless: bool = True
     browser_type: str = "chromium"
-
+    test_env: str = "local"  # ← 新增：支持 local/staging/ci 等环境标识
 
 settings = TestConfig()
+
+def pytest_addoption(parser: pytest.Parser) -> None:
+    """注册自定义命令行参数"""
+    parser.addoption(
+        "--headed",
+        action="store_true",
+        default=False,
+        help="以有头模式运行 Playwright（本地调试时查看浏览器）",
+    )
 
 
 # ============================================================================
@@ -81,12 +90,21 @@ def app() -> Generator[Flask, None, None]:
 # Function 级：数据库重置
 # ============================================================================
 def _seed_database(db: sqlite3.Connection) -> None:
-    """重置数据库到标准种子状态"""
+    """重置数据库到标准种子状态（防御性：覆盖所有可能被测试修改的表）"""
+    # 1. 清理动态数据（测试可能创建的订单、背包、额外用户）
     db.execute("DELETE FROM orders")
     db.execute("DELETE FROM backpack")
-    db.execute("UPDATE players SET gold = 1000")
+    db.execute("DELETE FROM players WHERE id > 5")  # 只保留 init_db 创建的 5 个默认用户
 
-    # 防御性：确保道具存在
+    # 2. 恢复固定数据（防止测试修改了道具名称、价格、玩家密码、金币）
+    db.execute(
+        "UPDATE items SET name = CASE id WHEN 1 THEN '生命药水' WHEN 2 THEN '魔法药水' END, "
+        "price = CASE id WHEN 1 THEN 100 WHEN 2 THEN 200 END "
+        "WHERE id IN (1, 2)"
+    )
+    db.execute("UPDATE players SET gold = 1000, password = '123' WHERE id <= 5")
+
+    # 3. 防御性补全（如果 items/players 被极端测试删除过）
     db.execute(
         "INSERT OR IGNORE INTO items (id, name, price) VALUES (?, ?, ?)",
         (1, "生命药水", 100),
@@ -95,8 +113,6 @@ def _seed_database(db: sqlite3.Connection) -> None:
         "INSERT OR IGNORE INTO items (id, name, price) VALUES (?, ?, ?)",
         (2, "魔法药水", 200),
     )
-
-    # 防御性：确保 5 个测试玩家存在（init_db 理论上已创建，这里兜底）
     for i in range(1, 6):
         db.execute(
             "INSERT OR IGNORE INTO players (id, username, password, gold) VALUES (?, ?, ?, ?)",
@@ -188,6 +204,31 @@ def logged_headers_player2(client: Any) -> dict[str, str]:
     token: str = resp.get_json()["token"]
     return {"Authorization": f"Bearer {token}"}
 
+@pytest.fixture
+def auth_headers(client: Any) -> Callable[[str, str], dict[str, str]]:
+    """动态登录任意用户，返回 headers（替代写死的 logged_headers）"""
+    def _login(username: str, password: str = "123") -> dict[str, str]:
+        resp = client.post(
+            "/api/login",
+            json={"username": username, "password": password},
+        )
+        assert resp.status_code == 200, f"登录失败: {resp.get_json()}"
+        token: str = resp.get_json()["token"]
+        return {"Authorization": f"Bearer {token}"}
+    return _login
+
+
+@pytest.fixture
+def unique_username() -> Callable[[], str]:
+    """生成唯一用户名，用于并发测试或完全隔离的数据准备"""
+    import uuid
+    counter = 0
+    def _gen() -> str:
+        nonlocal counter
+        counter += 1
+        return f"u_{uuid.uuid4().hex[:6]}_{counter}"
+    return _gen
+
 
 # ============================================================================
 # 快捷查金币
@@ -242,10 +283,14 @@ def base_url(app: Flask) -> Generator[str, None, None]:
 
 
 @pytest.fixture(scope="session")
-def browser() -> Generator[Browser, None, None]:
+def browser(request: pytest.FixtureRequest) -> Generator[Browser, None, None]:
+    # 命令行 --headed 优先于配置文件
+    use_headed = request.config.getoption("--headed")
+    headless_mode = False if use_headed else settings.headless
+
     with sync_playwright() as p:
         launcher = getattr(p, settings.browser_type)
-        browser_instance = launcher.launch(headless=settings.headless)
+        browser_instance = launcher.launch(headless=headless_mode)
         yield browser_instance
         browser_instance.close()
 
@@ -292,7 +337,9 @@ def pytest_sessionstart(session: pytest.Session) -> None:
     env_file.write_text(
         f"GameDB={settings.game_db}\n"
         f"Browser={settings.browser_type}\n"
-        f"Headless={settings.headless}\n",
+        f"Headless={settings.headless}\n"
+        f"TestEnv={settings.test_env}\n"
+        f"CI={os.environ.get('CI', 'false')}\n",
         encoding="utf-8",
     )
 

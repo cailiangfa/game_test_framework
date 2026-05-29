@@ -2,18 +2,36 @@ name: CI - Test & Allure Report
 
 on:
   push:
-    branches: [optimized-v2, main]
+    branches: [refactor-v3, optimized-v2, main]
   pull_request:
-    branches: [optimized-v2, main]
+    branches: [refactor-v3, optimized-v2, main]
+  schedule:
+    # 每天凌晨 2 点跑 Nightly Build（UTC 时间，对应北京时间 10 点）
+    - cron: '0 18 * * *'
 
 jobs:
-  api-tests:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install lint tools
+        run: pip install flake8 black isort
+      - name: Lint check
+        run: |
+          flake8 tests/ backend/ --max-line-length=120 --exclude=tests/__init__.py
+          black --check tests/ backend/
+          isort --check-only tests/ backend/
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+  api-tests:
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
@@ -21,16 +39,17 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Start backend
+      - name: Run API, Error & Concurrency Tests
         run: |
-          cd backend
-          python app.py &
-          sleep 3
-
-      - name: Run API & Unit Tests
-        run: pytest tests/ --ignore=tests/test_ui.py -v --alluredir=allure-results/api
+          pytest tests/ \
+            --ignore=tests/test_ui.py \
+            -v \
+            --alluredir=allure-results/api \
+            --reruns=1
         env:
-          BASE_URL: http://localhost:5000
+          CI: true
+          TEST_ENV: ci
+          GAME_DB: ${{ github.workspace }}/tests/test.db
 
       - name: Upload API results
         uses: actions/upload-artifact@v4
@@ -40,32 +59,31 @@ jobs:
           path: allure-results/api
 
   ui-tests:
+    needs: lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'
 
-      - name: Install dependencies & Playwright browsers
+      - name: Install dependencies & Playwright
         run: |
           pip install -r requirements.txt
-          playwright install
-          playwright install-deps
-
-      - name: Start backend
-        run: |
-          cd backend
-          python app.py &
-          sleep 3
+          playwright install chromium
+          playwright install-deps chromium
 
       - name: Run UI Tests
-        run: pytest tests/test_ui.py -v --alluredir=allure-results/ui
+        run: |
+          pytest tests/test_ui.py \
+            -v \
+            --alluredir=allure-results/ui \
+            --reruns=1
         env:
-          BASE_URL: http://localhost:5000
+          CI: true
+          TEST_ENV: ci
+          GAME_DB: ${{ github.workspace }}/tests/test.db
 
       - name: Upload UI results
         uses: actions/upload-artifact@v4
@@ -75,7 +93,7 @@ jobs:
           path: allure-results/ui
 
   generate-report:
-    needs: [ api-tests, ui-tests ]
+    needs: [api-tests, ui-tests]
     if: always()
     runs-on: ubuntu-latest
     permissions:
@@ -98,12 +116,12 @@ jobs:
       - name: Merge Allure Results
         run: |
           mkdir -p allure-results/merged
-          # 把 api 和 ui 的结果平铺合并到 allure-results/merged/
           find allure-results/api -name "*.json" -exec cp {} allure-results/merged/ \;
           find allure-results/ui -name "*.json" -exec cp {} allure-results/merged/ \;
-          # 如果有 environment.properties 也复制
-          find allure-results/api -name "environment.properties" -exec cp {} allure-results/merged/ \;
-          find allure-results/ui -name "environment.properties" -exec cp {} allure-results/merged/ \;
+          # 合并 environment.properties（CI 环境优先）
+          cat allure-results/api/environment.properties allure-results/ui/environment.properties 2>/dev/null | sort -u > allure-results/merged/environment.properties || true
+          echo "CI=true" >> allure-results/merged/environment.properties
+          echo "GitHubRunId=${{ github.run_id }}" >> allure-results/merged/environment.properties
           ls -la allure-results/merged/
 
       - name: Install Allure
@@ -121,3 +139,5 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./allure-report
+          destination_dir: ${{ github.run_number }}
+          keep_files: true

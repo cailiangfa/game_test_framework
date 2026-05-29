@@ -1,5 +1,6 @@
 import pytest
 import allure
+from tests.utils.factories import create_player, set_player_gold, give_item_to_player
 
 class TestBuyItem:
     """购买道具正向测试"""
@@ -65,17 +66,45 @@ class TestBuyItem:
         assert order['quantity'] == quantity
         assert order['amount'] == price * quantity
 
+    @allure.feature("购买功能")
+    @allure.story("动态用户独立测试")
+    def test_buy_with_factory_user(self, client, db_check, auth_headers):
+        """使用数据工厂创建独立用户，验证精确边界（金币刚好花完）"""
+        # 创建全新用户，与 player1 完全隔离
+        player_id = create_player("test_buyer_factory", gold=300)
+        headers = auth_headers("test_buyer_factory")
+
+        # 买 3 瓶生命药水（100*3=300），金币刚好清零
+        resp = client.post('/api/buy',
+                           json={'item_id': 1, 'quantity': 3},
+                           headers=headers)
+
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data['gold_remain'] == 0
+        assert data['msg'] == '购买成功'
+
+        # 数据库断言：背包有 3 个，订单 1 条
+        backpack = db_check(
+            "SELECT count FROM backpack WHERE player_id=? AND item_id=?",
+            (player_id, 1)
+        )
+        assert backpack['count'] == 3
+
+        orders = db_check(
+            "SELECT COUNT(*) as cnt FROM orders WHERE player_id=?",
+            (player_id,)
+        )
+        assert orders['cnt'] == 1
+
 
 class TestSellItem:
     """出售道具正向测试"""
 
     @pytest.fixture(autouse=True)
     def setup_for_sell(self, client, logged_headers):
-        """前置：买 5 瓶生命药水"""
-        resp = client.post('/api/buy',
-                           json={'item_id': 1, 'quantity': 5},
-                           headers=logged_headers)
-        assert resp.status_code == 200, f"前置购买失败: {resp.get_json()}"
+        """前置：直接给 player1 背包塞 5 瓶生命药水（比调购买接口更快更稳定）"""
+        give_item_to_player(player_id=1, item_id=1, count=5)
 
     @allure.feature("支付功能")  # 功能模块：支付
     @allure.story("测试模拟支付")  # 故事线：模拟支付场景
