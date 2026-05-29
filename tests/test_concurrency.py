@@ -7,7 +7,6 @@ from __future__ import annotations
 import threading
 import time
 import allure
-import pytest
 import requests
 
 from tests.utils.factories import create_player, get_token
