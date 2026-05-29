@@ -1,13 +1,31 @@
- venv/
+# 环境配置（含敏感信息）
+.env
+
+# Python
+venv/
 __pycache__/
 *.pyc
+*.egg-info/
 .pytest_cache/
+.mypy_cache/
+
+# 测试报告（自动生成）
 allure-results/
 allure-report/
+locust-reports/
+videos/
+htmlcov/
+.coverage
+coverage.xml
+
+# 数据库
 *.db
-locust-report.html
+game.db
+
+# IDE
 .idea/
+.vscode/
+
+# 操作系统
 .DS_Store
-*.log
-node_modules/
-package-lock.json
+Thumbs.db
