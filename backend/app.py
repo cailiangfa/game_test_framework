@@ -1,5 +1,6 @@
 """
 Game Shop Backend - 企业级重构版本
+backend/app.py
 """
 
 from __future__ import annotations

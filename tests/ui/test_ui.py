@@ -1,4 +1,5 @@
 """
+tests/ui/test_ui.py
 UI 自动化测试：Page Object 模式
 适配修复后的 conftest.py（autouse 数据重置 + page fixture 自动截图）
 """

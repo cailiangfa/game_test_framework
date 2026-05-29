@@ -1,11 +1,7 @@
 """
-企业级 Pytest Fixture 体系 - CI 修复版
-修复点：
-1. db_check 显式转 dict，避免 sqlite3.Row 在 CI 中的兼容问题
-2. _seed_database 防御性补全 players/items，防止数据缺失
-3. 强制 GAME_DB 环境变量，避免路径漂移
+tests/conftest.py
+最终版：修复循环导入 + Playwright Trace + 统一配置
 """
-
 from __future__ import annotations
 
 import logging
@@ -21,49 +17,21 @@ from typing import TYPE_CHECKING, Any, Callable, Generator
 import allure
 import pytest
 from playwright.sync_api import Browser, Page, sync_playwright
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from werkzeug.serving import make_server
 
 if TYPE_CHECKING:
     from flask import Flask
 
+# 统一配置中心
+from config import settings  # noqa: E402
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-# 强制绑定测试数据库路径，防止被 .env 或系统环境覆盖
-TEST_DB_PATH = str(PROJECT_ROOT / "tests" / "test.db")
-os.environ["GAME_DB"] = TEST_DB_PATH
+# 强制绑定测试数据库
+os.environ["GAME_DB"] = settings.game_db
 
 import backend.app as backend_module  # noqa: E402
-
-
-# ============================================================================
-# 配置中心
-# ============================================================================
-class TestConfig(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
-    game_db: str = TEST_DB_PATH
-    host: str = "127.0.0.1"
-    headless: bool = True
-    browser_type: str = "chromium"
-    test_env: str = "local"  # ← 新增：支持 local/staging/ci 等环境标识
-
-
-settings = TestConfig()
-
-
-def pytest_addoption(parser: pytest.Parser) -> None:
-    """注册自定义命令行参数"""
-    parser.addoption(
-        "--headed",
-        action="store_true",
-        default=False,
-        help="以有头模式运行 Playwright（本地调试时查看浏览器）",
-    )
 
 
 # ============================================================================
@@ -80,7 +48,7 @@ def app() -> Generator[Flask, None, None]:
     )
     backend_module.init_db()
     allure.attach(
-        f"Database: {settings.game_db}\nTesting Mode: True",
+        f"Database: {settings.game_db}\nEnv: {settings.test_env}",
         name="Test Environment",
         attachment_type=allure.attachment_type.TEXT,
     )
@@ -91,13 +59,11 @@ def app() -> Generator[Flask, None, None]:
 # Function 级：数据库重置
 # ============================================================================
 def _seed_database(db: sqlite3.Connection) -> None:
-    """重置数据库到标准种子状态（防御性：覆盖所有可能被测试修改的表）"""
-    # 1. 清理动态数据（测试可能创建的订单、背包、额外用户）
+    """重置数据库到标准种子状态"""
     db.execute("DELETE FROM orders")
     db.execute("DELETE FROM backpack")
-    db.execute("DELETE FROM players WHERE id > 5")  # 只保留 init_db 创建的 5 个默认用户
+    db.execute("DELETE FROM players WHERE id > 5")
 
-    # 2. 恢复固定数据（防止测试修改了道具名称、价格、玩家密码、金币）
     db.execute(
         "UPDATE items SET name = CASE id WHEN 1 THEN '生命药水' WHEN 2 THEN '魔法药水' END, "
         "price = CASE id WHEN 1 THEN 100 WHEN 2 THEN 200 END "
@@ -105,7 +71,6 @@ def _seed_database(db: sqlite3.Connection) -> None:
     )
     db.execute("UPDATE players SET gold = 1000, password = '123' WHERE id <= 5")
 
-    # 3. 防御性补全（如果 items/players 被极端测试删除过）
     db.execute(
         "INSERT OR IGNORE INTO items (id, name, price) VALUES (?, ?, ?)",
         (1, "生命药水", 100),
@@ -147,7 +112,7 @@ def _cleanup_session() -> Generator[None, None, None]:
 
 
 # ============================================================================
-# 数据库直查 Fixture（修复：显式转 dict）
+# 数据库直查 Fixture
 # ============================================================================
 @pytest.fixture
 def db_check(app: Flask) -> Callable[..., Any | None]:
@@ -157,7 +122,6 @@ def db_check(app: Flask) -> Callable[..., Any | None]:
             db.row_factory = sqlite3.Row
             cur = db.execute(sql, params)
             row = cur.fetchone()
-            # 显式转 dict，避免 CI 中 sqlite3.Row 行为不一致
             return dict(row) if row else None
 
     return _check
@@ -210,7 +174,7 @@ def logged_headers_player2(client: Any) -> dict[str, str]:
 
 @pytest.fixture
 def auth_headers(client: Any) -> Callable[[str, str], dict[str, str]]:
-    """动态登录任意用户，返回 headers（替代写死的 logged_headers）"""
+    """动态登录任意用户"""
 
     def _login(username: str, password: str = "123") -> dict[str, str]:
         resp = client.post(
@@ -226,7 +190,6 @@ def auth_headers(client: Any) -> Callable[[str, str], dict[str, str]]:
 
 @pytest.fixture
 def unique_username() -> Callable[[], str]:
-    """生成唯一用户名，用于并发测试或完全隔离的数据准备"""
     import uuid
 
     counter = 0
@@ -239,9 +202,6 @@ def unique_username() -> Callable[[], str]:
     return _gen
 
 
-# ============================================================================
-# 快捷查金币
-# ============================================================================
 @pytest.fixture
 def get_gold(client: Any, logged_headers: dict[str, str]) -> Callable[[], int]:
     def _get() -> int:
@@ -253,7 +213,7 @@ def get_gold(client: Any, logged_headers: dict[str, str]) -> Callable[[], int]:
 
 
 # ============================================================================
-# Playwright 浏览器 Fixture
+# 真实 HTTP 服务器（UI + 并发测试用）
 # ============================================================================
 def _get_free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -292,10 +252,12 @@ def base_url(app: Flask) -> Generator[str, None, None]:
     server.shutdown()
 
 
+# ============================================================================
+# Playwright 浏览器 Fixture（增强 Trace 录制）
+# ============================================================================
 @pytest.fixture(scope="session")
 def browser(request: pytest.FixtureRequest) -> Generator[Browser, None, None]:
-    # 命令行 --headed 优先于配置文件
-    use_headed = request.config.getoption("--headed")
+    use_headed = request.config.getoption("--headed", default=False)
     headless_mode = False if use_headed else settings.headless
 
     with sync_playwright() as p:
@@ -305,9 +267,6 @@ def browser(request: pytest.FixtureRequest) -> Generator[Browser, None, None]:
         browser_instance.close()
 
 
-# ============================================================================
-# pytest hook：失败自动截图
-# ============================================================================
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
 def pytest_runtest_makereport(
     item: pytest.Item, call: pytest.CallInfo[Any]
@@ -319,16 +278,33 @@ def pytest_runtest_makereport(
 
 @pytest.fixture
 def page(
-    browser: Browser, base_url: str, request: pytest.FixtureRequest
+        browser: Browser, base_url: str, request: pytest.FixtureRequest
 ) -> Generator[Page, None, None]:
-    context = browser.new_context(viewport={"width": 1280, "height": 720})
+    # 1. 创建上下文（只保留正确的参数）
+    context = browser.new_context(
+        viewport={"width": 1280, "height": 720},
+        record_video_dir="videos/",
+    )
+
+    # 2. 开启 Trace 录制（截图 + DOM快照 + 网络 + 控制台）
+    context.tracing.start(screenshots=True, snapshots=True, sources=True)
+
     pg = context.new_page()
     yield pg
 
+    # 3. 判断用例是否失败
     failed = False
     if hasattr(request.node, "rep_call"):
         failed = request.node.rep_call.failed
 
+    # 4. 保存 Trace 文件
+    trace_dir = Path("test-results") / request.node.name.replace(":", "_")
+    trace_dir.mkdir(parents=True, exist_ok=True)
+    trace_path = trace_dir / "trace.zip"
+
+    context.tracing.stop(path=str(trace_path))
+
+    # 5. 失败时截图 + 附加 Trace 到 Allure
     if failed:
         try:
             allure.attach(
@@ -339,9 +315,17 @@ def page(
         except Exception:
             pass
 
+        try:
+            if trace_path.exists():
+                allure.attach.file(
+                    str(trace_path),
+                    name="playwright_trace",
+                    attachment_type=allure.attachment_type.ZIP,
+                )
+        except Exception:
+            pass
+
     context.close()
-
-
 # ============================================================================
 # Allure 环境信息
 # ============================================================================
@@ -359,19 +343,17 @@ def pytest_sessionstart(session: pytest.Session) -> None:
 
 
 # ============================================================================
-# API / Page Object Fixture
+# API / Page Object Fixture（延迟导入，避免循环导入）
 # ============================================================================
-from tests.api.shop_api import ShopAPI  # noqa: E402
-
-
 @pytest.fixture
-def shop_api(client: Any, logged_headers: dict[str, str]) -> ShopAPI:
+def shop_api(client: Any, logged_headers: dict[str, str]) -> Any:
+    from tests.api.shop_api import ShopAPI
+
     return ShopAPI(client, logged_headers)
 
 
-from tests.pages.shop_page import ShopPage  # noqa: E402
-
-
 @pytest.fixture
-def shop_page(page: Page, base_url: str) -> ShopPage:
+def shop_page(page: Page, base_url: str) -> Any:
+    from tests.pages.shop_page import ShopPage
+
     return ShopPage(page, base_url)

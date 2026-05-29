@@ -1,4 +1,5 @@
 """
+tests/pages/shop_page.py
 商城页面 Page Object
 - 封装所有元素定位策略
 - 封装页面业务操作（买/卖/查金币）
