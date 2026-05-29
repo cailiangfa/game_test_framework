@@ -1,31 +1,58 @@
-# 环境配置（含敏感信息）
-.env
-
-# Python
-venv/
+# === Python ===
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
 *.egg-info/
-.pytest_cache/
-.mypy_cache/
+.installed.cfg
+*.egg
+.env
+.venv
+env/
+venv/
+ENV/
 
-# 测试报告（自动生成）
-allure-results/
-allure-report/
-locust-reports/
-videos/
-htmlcov/
+# === pytest / Test ===
+.pytest_cache/
 .coverage
 coverage.xml
+htmlcov/
+test-results/
+screenshots/
+videos/
 
-# 数据库
+# === Allure ===
+allure-results/
+allure-report/
+
+# === Locust ===
+locust-reports/
+
+# === Database ===
 *.db
-game.db
+*.sqlite
+*.sqlite3
 
-# IDE
+# === IDE ===
 .idea/
 .vscode/
+*.swp
+*.swo
+*~
 
-# 操作系统
+# === OS ===
 .DS_Store
 Thumbs.db
