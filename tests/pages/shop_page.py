@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import Any, Callable
 
 import allure
@@ -94,7 +93,9 @@ class ShopPage:
 
     # ---------- 组合业务方法（测试脚本直接调这个）----------
     @allure.step("购买道具 item_id={item_id}, quantity={quantity}")
-    def buy(self, item_id: int, quantity: int, expect_gold_change: bool = True) -> "ShopPage":
+    def buy(
+        self, item_id: int, quantity: int, expect_gold_change: bool = True
+    ) -> "ShopPage":
         """一站式购买：设置数量 -> 点击购买 -> 可选等待金币刷新"""
         if expect_gold_change:
             before = self.get_gold()
@@ -105,7 +106,7 @@ class ShopPage:
             # 购买成功场景：等金币变化
             self.page.wait_for_function(
                 f"document.getElementById('gold-amount').textContent !== '{before}'",
-                timeout=5000
+                timeout=5000,
             )
 
         return self

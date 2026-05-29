@@ -1,6 +1,7 @@
 """
 数据工厂 - 动态创建测试数据，替代写死的 JSON 和固定用户
 """
+
 from __future__ import annotations
 
 import backend.app as backend_module

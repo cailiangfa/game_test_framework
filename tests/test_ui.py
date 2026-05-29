@@ -8,7 +8,6 @@ from __future__ import annotations
 import json
 
 import allure
-import pytest
 
 from tests.pages.shop_page import ShopPage
 

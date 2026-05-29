@@ -49,10 +49,7 @@ class StepLoadProfile:
     def __post_init__(self):
         if self.steps is None:
             # 保守阶梯：5→20→50，观察拐点
-            object.__setattr__(
-                self, 'steps',
-                [(5, 60), (20, 60), (50, 120)]
-            )
+            object.__setattr__(self, "steps", [(5, 60), (20, 60), (50, 120)])
 
 
 def get_baseline(env: str | None = None) -> PerformanceBaseline:

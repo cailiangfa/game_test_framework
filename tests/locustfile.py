@@ -1,5 +1,6 @@
 import random
-from locust import HttpUser, task, between
+
+from locust import HttpUser, between, task
 
 
 class GameShopUser(HttpUser):
@@ -14,8 +15,7 @@ class GameShopUser(HttpUser):
         username = f"player{player_num}"
 
         resp = self.client.post(
-            "/api/login",
-            json={"username": username, "password": "123"}
+            "/api/login", json={"username": username, "password": "123"}
         )
 
         if resp.status_code == 200:
@@ -39,9 +39,7 @@ class GameShopUser(HttpUser):
             return
 
         with self.client.get(
-            "/api/gold",
-            headers=self.headers,
-            catch_response=True
+            "/api/gold", headers=self.headers, catch_response=True
         ) as resp:
             if resp.status_code == 200:
                 resp.success()
@@ -58,7 +56,7 @@ class GameShopUser(HttpUser):
             "/api/buy",
             json={"item_id": 1, "quantity": 1},
             headers=self.headers,
-            catch_response=True
+            catch_response=True,
         ) as resp:
             if resp.status_code == 200:
                 resp.success()
@@ -79,7 +77,7 @@ class GameShopUser(HttpUser):
             "/api/sell",
             json={"item_id": 1, "quantity": 1},
             headers=self.headers,
-            catch_response=True
+            catch_response=True,
         ) as resp:
             if resp.status_code == 200:
                 resp.success()

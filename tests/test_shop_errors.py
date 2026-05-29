@@ -6,10 +6,9 @@
 from __future__ import annotations
 
 import allure
-import pytest
-
 from tests.api.shop_api import ShopAPI
-from tests.utils.assertions import assert_backpack_unchanged, assert_data_unchanged
+from tests.utils.assertions import (assert_backpack_unchanged,
+                                    assert_data_unchanged)
 
 
 # ============================================================================
@@ -101,7 +100,9 @@ class TestBusinessErrors:
     def test_sell_insufficient_items(self, shop_api: ShopAPI, db_check):
         with allure.step("Step 0: 前置 - 购买 2 瓶生命药水"):
             buy_result = shop_api.buy(item_id=1, quantity=2)
-            assert buy_result["status_code"] == 200, f"前置购买失败: {buy_result['data']}"
+            assert (
+                buy_result["status_code"] == 200
+            ), f"前置购买失败: {buy_result['data']}"
 
         with allure.step("Step 1: 记录出售前状态"):
             before_gold = shop_api.get_gold()
@@ -182,7 +183,10 @@ class TestValidationErrors:
                 headers=shop_api.headers,
             )
             assert resp.status_code == 400
-            assert "缺少" in resp.get_json()["error"] or "item_id" in resp.get_json()["error"]
+            assert (
+                "缺少" in resp.get_json()["error"]
+                or "item_id" in resp.get_json()["error"]
+            )
 
     @allure.title("请求体为空：不触发 500")
     @allure.severity(allure.severity_level.NORMAL)

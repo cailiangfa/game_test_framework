@@ -6,9 +6,7 @@ Mock 外部支付验证服务测试
 from __future__ import annotations
 
 import allure
-import pytest
 from pytest_mock import MockerFixture
-
 import backend.app as backend_module
 from tests.api.shop_api import ShopAPI
 from tests.utils.assertions import assert_data_unchanged
@@ -46,7 +44,9 @@ class TestMockPayment:
 
     @allure.title("支付验证失败：返回 400，数据绝对不变")
     @allure.severity(allure.severity_level.CRITICAL)
-    def test_payment_verify_failed(self, shop_api: ShopAPI, mocker: MockerFixture, db_check):
+    def test_payment_verify_failed(
+        self, shop_api: ShopAPI, mocker: MockerFixture, db_check
+    ):
         with allure.step("Step 1: 记录购买前状态"):
             before_gold = shop_api.get_gold()
             before_orders = db_check(
@@ -86,11 +86,15 @@ class TestMockPayment:
                 "SELECT count FROM backpack WHERE player_id=? AND item_id=?", (1, 1)
             )
             actual = after_bp["count"] if after_bp else 0
-            assert actual == before_count, f"异常后背包数量不应变化: {actual} != {before_count}"
+            assert (
+                actual == before_count
+            ), f"异常后背包数量不应变化: {actual} != {before_count}"
 
     @allure.title("支付服务超时：返回 500，数据绝对不变")
     @allure.severity(allure.severity_level.CRITICAL)
-    def test_payment_service_timeout(self, shop_api: ShopAPI, mocker: MockerFixture, db_check):
+    def test_payment_service_timeout(
+        self, shop_api: ShopAPI, mocker: MockerFixture, db_check
+    ):
         with allure.step("Step 1: 记录购买前状态"):
             before_gold = shop_api.get_gold()
             before_orders = db_check(
@@ -130,4 +134,6 @@ class TestMockPayment:
                 "SELECT count FROM backpack WHERE player_id=? AND item_id=?", (1, 1)
             )
             actual = after_bp["count"] if after_bp else 0
-            assert actual == before_count, f"异常后背包数量不应变化: {actual} != {before_count}"
+            assert (
+                actual == before_count
+            ), f"异常后背包数量不应变化: {actual} != {before_count}"

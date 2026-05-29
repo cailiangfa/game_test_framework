@@ -21,6 +21,7 @@ app.config["TESTING"] = False
 
 DATABASE = os.environ.get("GAME_DB", os.path.join(os.path.dirname(__file__), "game.db"))
 
+
 # ========== 结构化日志配置 ==========
 class JSONFormatter(logging.Formatter):
     def format(self, record: logging.LogRecord) -> str:
@@ -88,8 +89,7 @@ def init_db() -> None:
         os.makedirs(db_dir, exist_ok=True)
 
     with sqlite3.connect(DATABASE) as db:
-        db.executescript(
-            """
+        db.executescript("""
             DROP TABLE IF EXISTS players;
             DROP TABLE IF EXISTS items;
             DROP TABLE IF EXISTS backpack;
@@ -126,8 +126,7 @@ def init_db() -> None:
                 status TEXT DEFAULT 'created',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
-            """
-        )
+            """)
 
         db.execute(
             "INSERT OR IGNORE INTO items (id, name, price) VALUES (?, ?, ?)",
@@ -172,7 +171,9 @@ def require_auth(f: Callable[..., Any]) -> Callable[..., Any]:
         db = get_db()
         user = db.execute("SELECT id FROM players WHERE id=?", (player_id,)).fetchone()
         if not user:
-            logger.warning("Auth failed: player not found", extra={"player_id": player_id})
+            logger.warning(
+                "Auth failed: player not found", extra={"player_id": player_id}
+            )
             return jsonify({"error": "玩家不存在"}), 404
 
         return f(player_id=player_id, *args, **kwargs)
@@ -189,7 +190,9 @@ def bad_request(error: Any) -> Any:
 
 @app.errorhandler(500)
 def internal_error(error: Any) -> Any:
-    logger.error("Internal server error", extra={"url": request.url, "error": str(error)})
+    logger.error(
+        "Internal server error", extra={"url": request.url, "error": str(error)}
+    )
     return jsonify({"error": "服务器内部错误"}), 500
 
 
@@ -258,7 +261,10 @@ class GameService:
         try:
             verify_result = external_payment.verify(player_id, total)
         except Exception as exc:
-            logger.error("Payment service error", extra={"error": str(exc), "player_id": player_id})
+            logger.error(
+                "Payment service error",
+                extra={"error": str(exc), "player_id": player_id},
+            )
             raise RuntimeError(f"支付服务异常: {exc}") from exc
 
         if not verify_result.get("passed", False):
@@ -283,7 +289,12 @@ class GameService:
         new_gold = GameService.get_player_gold(player_id)
         logger.info(
             "Item purchased",
-            extra={"player_id": player_id, "item_id": item_id, "quantity": quantity, "cost": total},
+            extra={
+                "player_id": player_id,
+                "item_id": item_id,
+                "quantity": quantity,
+                "cost": total,
+            },
         )
         return {"gold_remain": new_gold, "msg": "购买成功"}
 
@@ -322,7 +333,12 @@ class GameService:
         new_gold = GameService.get_player_gold(player_id)
         logger.info(
             "Item sold",
-            extra={"player_id": player_id, "item_id": item_id, "quantity": quantity, "income": total},
+            extra={
+                "player_id": player_id,
+                "item_id": item_id,
+                "quantity": quantity,
+                "income": total,
+            },
         )
         return {"gold_remain": new_gold, "msg": "出售成功"}
 
@@ -343,6 +359,7 @@ class GameService:
 # ========== HTTP 接口层 ==========
 
 # 在 login 路由前面加这个：
+
 
 @app.route("/api/register", methods=["POST"])
 def register() -> Any:
@@ -365,6 +382,7 @@ def register() -> Any:
         return jsonify({"msg": "注册成功"}), 201
     except sqlite3.IntegrityError:
         return jsonify({"error": "用户名已存在"}), 409
+
 
 @app.route("/api/login", methods=["POST"])
 def login() -> Any:

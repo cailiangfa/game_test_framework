@@ -1,11 +1,14 @@
-from typing import Any
-import allure
 import json
+from typing import Any
+
+import allure
 from flask.testing import FlaskClient
 
 
 class ShopAPI:
-    def __init__(self, client: FlaskClient, headers: dict[str, str] | None = None) -> None:
+    def __init__(
+        self, client: FlaskClient, headers: dict[str, str] | None = None
+    ) -> None:
         self.client = client
         self.headers = headers or {}
 
@@ -40,11 +43,15 @@ class ShopAPI:
                 attachment_type=allure.attachment_type.JSON,
             )
             allure.attach(
-                json.dumps({
-                    "status_code": resp.status_code,
-                    "data": resp_data,
-                    "headers": dict(resp.headers),
-                }, ensure_ascii=False, indent=2),
+                json.dumps(
+                    {
+                        "status_code": resp.status_code,
+                        "data": resp_data,
+                        "headers": dict(resp.headers),
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
                 name="failed_response",
                 attachment_type=allure.attachment_type.JSON,
             )
@@ -53,7 +60,9 @@ class ShopAPI:
 
     @allure.step("登录: username={username}")
     def login(self, username: str, password: str) -> dict[str, Any]:
-        resp, data = self._request("post", "/api/login", json={"username": username, "password": password})
+        resp, data = self._request(
+            "post", "/api/login", json={"username": username, "password": password}
+        )
         return {"status_code": resp.status_code, "data": data}
 
     @allure.step("获取金币")

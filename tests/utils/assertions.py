@@ -24,8 +24,12 @@ def assert_data_unchanged(
         "SELECT COUNT(*) as cnt FROM orders WHERE player_id=?", (player_id,)
     )["cnt"]
 
-    assert after_gold == expected_gold, f"异常后金币不应变化: {after_gold} != {expected_gold}"
-    assert after_orders == expected_orders, f"异常后订单数不应变化: {after_orders} != {expected_orders}"
+    assert (
+        after_gold == expected_gold
+    ), f"异常后金币不应变化: {after_gold} != {expected_gold}"
+    assert (
+        after_orders == expected_orders
+    ), f"异常后订单数不应变化: {after_orders} != {expected_orders}"
 
 
 @allure.step("验证背包数量未变化")  # ← 去掉 f-string，避免 KeyError
@@ -42,7 +46,9 @@ def assert_backpack_unchanged(
         (player_id, item_id),
     )
     actual = after_bp["count"] if after_bp else 0
-    assert actual == expected_count, f"异常后背包数量不应变化: {actual} != {expected_count}"
+    assert (
+        actual == expected_count
+    ), f"异常后背包数量不应变化: {actual} != {expected_count}"
 
     def assert_data_unchanged(get_gold_fn, db_check_fn, expected_gold, expected_orders):
         """验证金币和订单数未发生变化（防止脏写）"""
@@ -50,8 +56,12 @@ def assert_backpack_unchanged(
         actual_orders = db_check_fn(
             "SELECT COUNT(*) as cnt FROM orders WHERE player_id=?", (1,)
         )["cnt"]
-        assert actual_gold == expected_gold, f"金币被脏写: {actual_gold} != {expected_gold}"
-        assert actual_orders == expected_orders, f"订单数被脏写: {actual_orders} != {expected_orders}"
+        assert (
+            actual_gold == expected_gold
+        ), f"金币被脏写: {actual_gold} != {expected_gold}"
+        assert (
+            actual_orders == expected_orders
+        ), f"订单数被脏写: {actual_orders} != {expected_orders}"
 
     def assert_backpack_unchanged(db_check_fn, expected_count):
         """验证背包道具数量未发生变化（防止脏写）"""
@@ -60,4 +70,6 @@ def assert_backpack_unchanged(
             (1, 1),
         )
         actual_count = actual_bp["count"] if actual_bp else 0
-        assert actual_count == expected_count, f"背包数量被脏写: {actual_count} != {expected_count}"
+        assert (
+            actual_count == expected_count
+        ), f"背包数量被脏写: {actual_count} != {expected_count}"

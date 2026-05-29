@@ -117,6 +117,7 @@ class TestRaceCondition:
         # 创建玩家并直接给 5 瓶药水
         player_id = create_player("concurrent_seller", gold=0)
         from tests.utils.factories import give_item_to_player
+
         give_item_to_player(player_id, item_id=1, count=5)
 
         token = get_token(player_id)

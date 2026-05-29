@@ -2,23 +2,19 @@
 工程级 Locust 压测脚本
 适配后端：SQLite + Flask 单线程，有注册接口
 """
+
 from __future__ import annotations
 
-from locust import HttpUser, task, events, between
 import json
 import random
 import uuid
 from pathlib import Path
 
-from locust import HttpUser, task, events
+from locust import HttpUser, between, events, task
 from locust.runners import MasterRunner
 
-from tests.performance.config import (
-    get_baseline,
-    ITEM_IDS,
-    ITEM_WEIGHTS,
-    StepLoadProfile,
-)
+from tests.performance.config import (ITEM_IDS, ITEM_WEIGHTS, StepLoadProfile,
+                                      get_baseline)
 
 BASELINE = get_baseline()
 
@@ -39,8 +35,16 @@ class StepLoadShape:
 
 # ============ 基线判定 ============
 @events.request.add_listener
-def on_request(request_type, name, response_time, response_length,
-               response, context, exception, **kwargs):
+def on_request(
+    request_type,
+    name,
+    response_time,
+    response_length,
+    response,
+    context,
+    exception,
+    **kwargs,
+):
     if response_time > BASELINE.max_ms and response is not None:
         response.failure(f"绝对超时: {response_time}ms > {BASELINE.max_ms}ms")
 
@@ -54,7 +58,9 @@ def on_test_stop(environment, **kwargs):
     total = stats.total
 
     p95 = total.get_response_time_percentile(0.95)
-    error_rate = (total.num_failures / total.num_requests * 100) if total.num_requests else 0
+    error_rate = (
+        (total.num_failures / total.num_requests * 100) if total.num_requests else 0
+    )
 
     passed = error_rate <= BASELINE.error_rate_pct and p95 <= BASELINE.p95_ms
 
@@ -70,12 +76,16 @@ def on_test_stop(environment, **kwargs):
     # 写入报告
     Path("locust-reports").mkdir(exist_ok=True)
     with open("locust-reports/baseline.json", "w") as f:
-        json.dump({
-            "passed": passed,
-            "total_requests": total.num_requests,
-            "error_rate_pct": round(error_rate, 2),
-            "p95_ms": round(p95, 2),
-        }, f, indent=2)
+        json.dump(
+            {
+                "passed": passed,
+                "total_requests": total.num_requests,
+                "error_rate_pct": round(error_rate, 2),
+                "p95_ms": round(p95, 2),
+            },
+            f,
+            indent=2,
+        )
 
 
 # ============ 用户模型 ============
@@ -96,10 +106,13 @@ class GameShopUser(HttpUser):
         )
 
         # 登录
-        resp = self.client.post("/api/login", json={
-            "username": self.username,
-            "password": self.password,
-        })
+        resp = self.client.post(
+            "/api/login",
+            json={
+                "username": self.username,
+                "password": self.password,
+            },
+        )
 
         if resp.status_code == 200:
             self.token = resp.json()["token"]
@@ -142,8 +155,9 @@ class GameShopUser(HttpUser):
         if not self._check_ready():
             return
 
-        with self.client.get("/api/gold", headers=self.headers,
-                             catch_response=True) as resp:
+        with self.client.get(
+            "/api/gold", headers=self.headers, catch_response=True
+        ) as resp:
             if self._assert_ok(resp, ["gold"]):
                 resp.success()
 
@@ -155,10 +169,10 @@ class GameShopUser(HttpUser):
         item_id = self._random_item()
 
         with self.client.post(
-                "/api/buy",
-                json={"item_id": item_id, "quantity": 1},
-                headers=self.headers,
-                catch_response=True,
+            "/api/buy",
+            json={"item_id": item_id, "quantity": 1},
+            headers=self.headers,
+            catch_response=True,
         ) as resp:
             if resp.status_code == 400:
                 # 业务拒绝：余额不足等，不算系统错误
@@ -174,10 +188,10 @@ class GameShopUser(HttpUser):
         item_id = self._random_item()
 
         with self.client.post(
-                "/api/sell",
-                json={"item_id": item_id, "quantity": 1},
-                headers=self.headers,
-                catch_response=True,
+            "/api/sell",
+            json={"item_id": item_id, "quantity": 1},
+            headers=self.headers,
+            catch_response=True,
         ) as resp:
             if resp.status_code == 400:
                 resp.success()

@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import os
 import socket
+import sqlite3
 import sys
 import threading
 import time
@@ -19,14 +20,12 @@ from typing import TYPE_CHECKING, Any, Callable, Generator
 
 import allure
 import pytest
-import sqlite3
-from playwright.sync_api import Browser, BrowserContext, Page, sync_playwright
+from playwright.sync_api import Browser, Page, sync_playwright
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from werkzeug.serving import make_server
 
 if TYPE_CHECKING:
     from flask import Flask
-    from flask.testing import FlaskClient
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
@@ -53,7 +52,9 @@ class TestConfig(BaseSettings):
     browser_type: str = "chromium"
     test_env: str = "local"  # ← 新增：支持 local/staging/ci 等环境标识
 
+
 settings = TestConfig()
+
 
 def pytest_addoption(parser: pytest.Parser) -> None:
     """注册自定义命令行参数"""
@@ -158,6 +159,7 @@ def db_check(app: Flask) -> Callable[..., Any | None]:
             row = cur.fetchone()
             # 显式转 dict，避免 CI 中 sqlite3.Row 行为不一致
             return dict(row) if row else None
+
     return _check
 
 
@@ -168,6 +170,7 @@ def db_exec(app: Flask) -> Callable[..., None]:
             db = backend_module.get_db()
             db.execute(sql, params)
             db.commit()
+
     return _exec
 
 
@@ -204,9 +207,11 @@ def logged_headers_player2(client: Any) -> dict[str, str]:
     token: str = resp.get_json()["token"]
     return {"Authorization": f"Bearer {token}"}
 
+
 @pytest.fixture
 def auth_headers(client: Any) -> Callable[[str, str], dict[str, str]]:
     """动态登录任意用户，返回 headers（替代写死的 logged_headers）"""
+
     def _login(username: str, password: str = "123") -> dict[str, str]:
         resp = client.post(
             "/api/login",
@@ -215,6 +220,7 @@ def auth_headers(client: Any) -> Callable[[str, str], dict[str, str]]:
         assert resp.status_code == 200, f"登录失败: {resp.get_json()}"
         token: str = resp.get_json()["token"]
         return {"Authorization": f"Bearer {token}"}
+
     return _login
 
 
@@ -222,11 +228,14 @@ def auth_headers(client: Any) -> Callable[[str, str], dict[str, str]]:
 def unique_username() -> Callable[[], str]:
     """生成唯一用户名，用于并发测试或完全隔离的数据准备"""
     import uuid
+
     counter = 0
+
     def _gen() -> str:
         nonlocal counter
         counter += 1
         return f"u_{uuid.uuid4().hex[:6]}_{counter}"
+
     return _gen
 
 
@@ -239,6 +248,7 @@ def get_gold(client: Any, logged_headers: dict[str, str]) -> Callable[[], int]:
         resp = client.get("/api/gold", headers=logged_headers)
         data = resp.get_json()
         return data.get("gold", 0) if data else 0
+
     return _get
 
 
@@ -299,14 +309,18 @@ def browser(request: pytest.FixtureRequest) -> Generator[Browser, None, None]:
 # pytest hook：失败自动截图
 # ============================================================================
 @pytest.hookimpl(tryfirst=True, hookwrapper=True)
-def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo[Any]) -> Generator[None, Any, None]:
+def pytest_runtest_makereport(
+    item: pytest.Item, call: pytest.CallInfo[Any]
+) -> Generator[None, Any, None]:
     outcome = yield
     rep = outcome.get_result()
     setattr(item, f"rep_{rep.when}", rep)
 
 
 @pytest.fixture
-def page(browser: Browser, base_url: str, request: pytest.FixtureRequest) -> Generator[Page, None, None]:
+def page(
+    browser: Browser, base_url: str, request: pytest.FixtureRequest
+) -> Generator[Page, None, None]:
     context = browser.new_context(viewport={"width": 1280, "height": 720})
     pg = context.new_page()
     yield pg

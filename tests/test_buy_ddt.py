@@ -96,9 +96,9 @@ class TestBuyDDT:
 
             if expected_gold_delta is not None:
                 actual_delta = shop_api.get_gold() - before_gold
-                assert actual_delta == expected_gold_delta, (
-                    f"金币变化异常: 预期 {expected_gold_delta}, 实际 {actual_delta}"
-                )
+                assert (
+                    actual_delta == expected_gold_delta
+                ), f"金币变化异常: 预期 {expected_gold_delta}, 实际 {actual_delta}"
 
             if expected_bp_delta is not None:
                 final_bp = db_check(
@@ -106,6 +106,6 @@ class TestBuyDDT:
                     (1, item_id),
                 )
                 actual_delta = (final_bp["count"] if final_bp else 0) - before_bp_count
-                assert actual_delta == expected_bp_delta, (
-                    f"背包变化异常: 预期 {expected_bp_delta}, 实际 {actual_delta}"
-                )
+                assert (
+                    actual_delta == expected_bp_delta
+                ), f"背包变化异常: 预期 {expected_bp_delta}, 实际 {actual_delta}"
