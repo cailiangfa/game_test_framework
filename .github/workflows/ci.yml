@@ -2,7 +2,7 @@ name: Game Shop QA
 
 on:
   push:
-    branches: [main, refactor-v3]
+    branches: ['**']
   pull_request:
     branches: [main]
   schedule:
