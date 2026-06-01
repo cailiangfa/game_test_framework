@@ -13,60 +13,40 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-
+          cache: 'pip'
+      - run: pip install -r requirements.txt
       - name: Run API + Concurrency Tests
-        run: pytest tests/api tests/concurrency -v --cov=backend --cov-report=xml
-
-      - name: Upload Coverage
-        uses: codecov/codecov-action@v4
+        run: pytest tests/api tests/concurrency -v --cov=backend --cov-report=xml --alluredir=./allure-results
+      - uses: codecov/codecov-action@v4
         if: always()
         with:
           files: ./coverage.xml
           fail_ci_if_error: false
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: allure-api
+          path: allure-results
+          retention-days: 7
 
   ui-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
-          playwright install chromium
-
-      - name: Install Allure
-        run: |
-          wget -q https://github.com/allure-framework/allure2/releases/download/2.27.0/allure-2.27.0.tgz
-          tar -xzf allure-2.27.0.tgz
-          sudo mv allure-2.27.0 /opt/allure
-          sudo ln -s /opt/allure/bin/allure /usr/local/bin/allure
-
+          cache: 'pip'
+      - run: pip install -r requirements.txt
+      - run: playwright install chromium --with-deps
       - name: Run UI Tests
-        run: pytest tests/ui -v --alluredir=allure-results
-
-      - name: Generate Allure Report
+        run: pytest tests/ui -v --alluredir=./allure-results
+      - uses: actions/upload-artifact@v4
         if: always()
-        run: |
-          allure generate allure-results -o allure-report --clean
-
-      - name: Upload Allure Artifact
-        if: always()
-        uses: actions/upload-artifact@v4
         with:
-          name: allure-report-${{ github.run_id }}
-          path: allure-report
+          name: allure-ui
+          path: allure-results
           retention-days: 7

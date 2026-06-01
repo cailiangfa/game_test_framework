@@ -1,85 +1,241 @@
 """
 tests/api/test_overflow.py
-游戏数值安全测试：int64溢出、负值、零值、极大值
+游戏数值安全测试：int64 溢出、负值、零值、极大值、MAX_QUANTITY 边界
 这是游戏测试的差异化优势
+
+★ 核心改动：
+- 新增 MAX_QUANTITY 边界测试（10000 通过 / 10001 拒绝）
+- 新增出售侧溢出测试（与购买对称）
+- 验证具体错误信息，而非只检查 status_code
+- 所有异常用例增加数据不变断言（防脏写）
+★ 重构：assert_all_unchanged → assert_state_equals，升级为完整数据校验
+★ 修复：create_player 返回 tuple，需要解包
 """
 from __future__ import annotations
 
 import allure
 import pytest
 
-from tests.utils.factories import create_player, set_player_gold
+from tests.utils.assertions import assert_state_equals
+from tests.utils.factories import create_player, get_token
 
 
+# ---------- 辅助函数 ----------
+def _snapshot(db_check, player_id: int = 1, item_id: int = 1) -> dict:
+    """快照玩家当前状态（统一走 db_check，与 assert_state_equals 数据源一致）"""
+    row = db_check("SELECT gold FROM players WHERE id=?", (player_id,))
+    return {
+        "gold": int(row["gold"]) if row else 0,
+        "orders": db_check(
+            "SELECT COUNT(*) as cnt FROM orders WHERE player_id=?", (player_id,)
+        )["cnt"],
+        "bp_count": (
+            db_check(
+                "SELECT count FROM backpack WHERE player_id=? AND item_id=?",
+                (player_id, item_id),
+            )
+            or {}
+        ).get("count", 0),
+    }
+
+
+@pytest.mark.api
 @allure.feature("数值安全")
 @allure.story("边界与溢出")
 class TestNumericSafety:
     """验证后端数值计算的边界防护"""
 
+    # ========== 购买侧 ==========
+
     @allure.title("购买数量极大值（quantity=999999）应被拒绝")
     @allure.severity(allure.severity_level.CRITICAL)
-    def test_buy_huge_quantity_rejected(self, client, logged_headers, db_check):
+    def test_buy_huge_quantity_rejected(self, shop_api, db_check):
         """极大数量：验证后端不会计算溢出或挂掉"""
+        before = _snapshot(db_check)
+
+        result = shop_api.buy_raw(item_id=1, quantity=999999)
+        assert result["status_code"] == 400, (
+            f"极大数量应被拒绝，实际: {result['status_code']}"
+        )
+        # ★ 验证具体错误信息：应提示数量上限
+        error_msg = result["data"].get("error", "")
+        assert "数量" in error_msg or "超过" in error_msg, (
+            f"错误信息应包含数量上限提示，实际: {error_msg}"
+        )
+
+        # 数据不变（金币 + 订单 + 背包完整校验）
+        assert_state_equals(
+            db_check,
+            expected_gold=before["gold"],
+            expected_orders=before["orders"],
+            expected_bp_count=before["bp_count"],
+        )
+
+    @allure.title("购买数量零值/负值应被拒绝: quantity={bad_qty}")
+    @allure.severity(allure.severity_level.NORMAL)
+    @pytest.mark.parametrize(
+        "bad_qty",
+        [0, -1, -999],
+        ids=["zero", "negative_one", "huge_negative"],
+    )
+    def test_buy_zero_negative_rejected(self, shop_api, db_check, bad_qty):
+        """零值和负值：验证参数校验 + 数据不变"""
+        before = _snapshot(db_check)
+
+        result = shop_api.buy_raw(item_id=1, quantity=bad_qty)
+        assert result["status_code"] == 400, f"quantity={bad_qty} 应被拒绝"
+
+        error_msg = result["data"].get("error", "")
+        assert "正整数" in error_msg, f"应提示'正整数'，实际: {error_msg}"
+
+        assert_state_equals(
+            db_check,
+            expected_gold=before["gold"],
+            expected_orders=before["orders"],
+            expected_bp_count=before["bp_count"],
+        )
+
+    @allure.title("item_id 非法值应被拒绝: item_id={bad_id}")
+    @allure.severity(allure.severity_level.NORMAL)
+    @pytest.mark.parametrize(
+        "bad_id, expected_keyword",
+        [(0, "不存在"), (-1, "不存在"), (99999, "不存在")],
+        ids=["zero", "negative", "not_exist"],
+    )
+    def test_buy_invalid_item_id(self, shop_api, db_check, bad_id, expected_keyword):
+        """非法道具 ID + 数据不变"""
+        before = _snapshot(db_check)
+
+        result = shop_api.buy_raw(item_id=bad_id, quantity=1)
+        assert result["status_code"] == 400, (
+            f"item_id={bad_id} 应返回 400，实际: {result['status_code']}"
+        )
+
+        error_msg = result["data"].get("error", "")
+        assert expected_keyword in error_msg, (
+            f"应包含'{expected_keyword}'，实际: {error_msg}"
+        )
+
+        assert_state_equals(
+            db_check,
+            expected_gold=before["gold"],
+            expected_orders=before["orders"],
+            expected_bp_count=before["bp_count"],
+        )
+
+    @allure.title("MAX_QUANTITY 边界：quantity=10000 成功，10001 拒绝")
+    @allure.severity(allure.severity_level.CRITICAL)
+    def test_buy_max_quantity_boundary(self, client, db_check):
+        """
+        验证后端 MAX_QUANTITY=10000 的边界行为：
+        - quantity=10000：如果金币足够，应该成功
+        - quantity=10001：应该被拒绝（超过上限）
+        """
+        # ★ 修复：create_player 返回 (player_id, username)，需要解包
+        player_id, _ = create_player(gold=2_000_000)
+        token = get_token(player_id)
+        headers = {"Authorization": f"Bearer {token}"}
+
+        # quantity=10000 应该成功
         resp = client.post(
             "/api/buy",
-            json={"item_id": 1, "quantity": 999999},
-            headers=logged_headers,
+            json={"item_id": 1, "quantity": 10000},
+            headers=headers,
         )
-        # 期望：400 参数错误，而不是 500 内部错误或 200 成功
-        assert resp.status_code == 400, f"极大数量应被拒绝，实际: {resp.status_code}"
+        assert resp.status_code == 200, (
+            f"quantity=10000（MAX_QUANTITY）应成功，实际: {resp.status_code}"
+        )
         data = resp.get_json()
-        assert "error" in data
+        assert data["gold_remain"] == 2_000_000 - 10000 * 100
 
-        # 数据库断言：金币和背包都不能变
-        gold = db_check("SELECT gold FROM players WHERE id=?", (1,))
-        assert gold["gold"] == 1000, "金币不应被修改"
-        bp = db_check("SELECT count FROM backpack WHERE player_id=? AND item_id=?", (1, 1))
-        assert bp is None or bp["count"] == 0, "背包不应增加"
+        # quantity=10001 应该被拒绝
+        resp2 = client.post(
+            "/api/buy",
+            json={"item_id": 1, "quantity": 10001},
+            headers=headers,
+        )
+        assert resp2.status_code == 400, (
+            f"quantity=10001 应被拒绝，实际: {resp2.status_code}"
+        )
+        error_msg = resp2.get_json().get("error", "")
+        assert "数量" in error_msg or "超过" in error_msg, (
+            f"应提示数量上限，实际: {error_msg}"
+        )
 
-    @allure.title("购买数量零值/负值应被拒绝")
+        # ★ 10001 失败后，金币应保持 10000 成功购买后的状态
+        gold_after = db_check("SELECT gold FROM players WHERE id=?", (player_id,))
+        assert int(gold_after["gold"]) == 2_000_000 - 10000 * 100, (
+            "10001 失败不应影响金币"
+        )
+
+    # ========== 出售侧 ==========
+
+    @allure.title("出售数量极大值（quantity=999999）应被拒绝")
+    @allure.severity(allure.severity_level.CRITICAL)
+    def test_sell_huge_quantity_rejected(self, shop_api, db_check):
+        """出售极大数量：应被拒绝，数据不变"""
+        before = _snapshot(db_check)
+
+        result = shop_api.sell_raw(item_id=1, quantity=999999)
+        assert result["status_code"] == 400
+
+        error_msg = result["data"].get("error", "")
+        # 可能是"数量超过上限"或"道具数量不足"，两个都算通过
+        assert any(
+            kw in error_msg for kw in ["数量", "不足", "超过"]
+        ), f"错误信息异常: {error_msg}"
+
+        assert_state_equals(
+            db_check,
+            expected_gold=before["gold"],
+            expected_orders=before["orders"],
+            expected_bp_count=before["bp_count"],
+        )
+
+    @allure.title("出售数量零值/负值应被拒绝: quantity={bad_qty}")
     @allure.severity(allure.severity_level.NORMAL)
-    def test_buy_zero_negative_rejected(self, client, logged_headers):
-        """零值和负值：验证参数校验"""
-        for bad_qty in [0, -1, -999]:
-            resp = client.post(
-                "/api/buy",
-                json={"item_id": 1, "quantity": bad_qty},
-                headers=logged_headers,
-            )
-            assert resp.status_code == 400, f"quantity={bad_qty} 应被拒绝"
+    @pytest.mark.parametrize(
+        "bad_qty",
+        [0, -1, -999],
+        ids=["zero", "negative_one", "huge_negative"],
+    )
+    def test_sell_zero_negative_rejected(self, shop_api, db_check, bad_qty):
+        """出售零值/负值：参数校验 + 数据不变"""
+        before = _snapshot(db_check)
 
-    @allure.title("item_id 负值/零值应被拒绝")
-    @allure.severity(allure.severity_level.NORMAL)
-    def test_buy_invalid_item_id(self, client, logged_headers):
-        """非法道具ID"""
-        for bad_id in [0, -1, 99999]:
-            resp = client.post(
-                "/api/buy",
-                json={"item_id": bad_id, "quantity": 1},
-                headers=logged_headers,
-            )
-            # 99999 可能返回 404（道具不存在），0/-1 应返回 400
-            assert resp.status_code in [400, 404], f"item_id={bad_id} 应被拒绝，实际: {resp.status_code}"
+        result = shop_api.sell_raw(item_id=1, quantity=bad_qty)
+        assert result["status_code"] == 400
+
+        error_msg = result["data"].get("error", "")
+        assert "正整数" in error_msg, f"应提示'正整数'，实际: {error_msg}"
+
+        assert_state_equals(
+            db_check,
+            expected_gold=before["gold"],
+            expected_orders=before["orders"],
+            expected_bp_count=before["bp_count"],
+        )
+
+    # ========== int64 边界（可选）==========
 
     @allure.title("玩家金币 int64 最大值边界")
     @pytest.mark.skip(reason="需要后端支持设置极大金币，可选测试")
-    def test_gold_int64_boundary(self, client, auth_headers, db_check):
+    def test_gold_int64_boundary(self, client, db_check):
         """
-        极限场景：如果后端用 int64 存金币，接近最大值时加钱不应溢出为负
-        这是一个概念测试，展示你对数值安全的关注
+        极限场景：如果后端用 int64 存金币，接近最大值时加钱不应溢出为负。
+        注意：当前后端用 Python int（无限精度），不会真正溢出；
+        如果迁移到 C/Java 后端，需要重新测试。
         """
-        # 创建金币极大的玩家（模拟 int64 接近上限）
-        player_id = create_player("rich_overflow", gold=2**63 - 1000)
-        headers = auth_headers("rich_overflow")
+        # ★ 修复：create_player 返回 (player_id, username)，需要解包
+        player_id, _ = create_player("rich_overflow", gold=2**63 - 1000)
+        token = get_token(player_id)
+        headers = {"Authorization": f"Bearer {token}"}
 
-        # 尝试买1瓶（100金币），应该成功
         resp = client.post(
             "/api/buy",
             json={"item_id": 1, "quantity": 1},
             headers=headers,
         )
-        # 这里不强制断言，因为后端可能不支持这么大金币
-        # 主要目的是展示测试设计思路
         allure.attach(
             f"初始金币: {2**63 - 1000}\n响应: {resp.status_code}\n数据: {resp.get_json()}",
             name="int64边界测试",

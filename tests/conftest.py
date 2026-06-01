@@ -1,6 +1,10 @@
 """
 tests/conftest.py
 最终版：修复循环导入 + Playwright Trace + 统一配置
+
+★ 核心修改：
+- _seed_database 使用 _hash_password("123")，与 app.py 密码逻辑保持一致
+- 移除了未使用的 shop_api_with_user fixture，保持简洁
 """
 from __future__ import annotations
 
@@ -22,16 +26,13 @@ from werkzeug.serving import make_server
 if TYPE_CHECKING:
     from flask import Flask
 
-# 统一配置中心
-from config import settings  # noqa: E402
+from config import settings
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-# 强制绑定测试数据库
-os.environ["GAME_DB"] = settings.game_db
-
-import backend.app as backend_module  # noqa: E402
+import backend.app as backend_module
+from backend.app import _hash_password  # ★ 导入密码哈希函数
 
 
 # ============================================================================
@@ -69,7 +70,10 @@ def _seed_database(db: sqlite3.Connection) -> None:
         "price = CASE id WHEN 1 THEN 100 WHEN 2 THEN 200 END "
         "WHERE id IN (1, 2)"
     )
-    db.execute("UPDATE players SET gold = 1000, password = '123' WHERE id <= 5")
+
+    # ★ 修复 P0：使用 _hash_password 生成密码，与 app.py / register 接口保持一致
+    # 如果 app.py 切换为 bcrypt，此处自动适配哈希值
+    db.execute("UPDATE players SET gold = 1000, password = ? WHERE id <= 5", (_hash_password("123"),))
 
     db.execute(
         "INSERT OR IGNORE INTO items (id, name, price) VALUES (?, ?, ?)",
@@ -82,14 +86,16 @@ def _seed_database(db: sqlite3.Connection) -> None:
     for i in range(1, 6):
         db.execute(
             "INSERT OR IGNORE INTO players (id, username, password, gold) VALUES (?, ?, ?, ?)",
-            (i, f"player{i}", "123", 1000),
+            (i, f"player{i}", _hash_password("123"), 1000),  # ★ 此处也用 _hash_password
         )
     db.commit()
 
 
 @pytest.fixture(autouse=True)
 def _reset_db(app: Flask) -> Generator[None, None, None]:
-    """每个测试函数执行前重置数据库"""
+    """
+    每个测试函数执行前重置数据库。
+    """
     with app.app_context():
         db = backend_module.get_db()
         db.row_factory = sqlite3.Row
@@ -98,15 +104,18 @@ def _reset_db(app: Flask) -> Generator[None, None, None]:
 
 
 # ============================================================================
-# Session 级清理
+# Session 级清理（连带删除 WAL 文件）
 # ============================================================================
 @pytest.fixture(scope="session", autouse=True)
 def _cleanup_session() -> Generator[None, None, None]:
     yield
     try:
-        if os.path.exists(settings.game_db):
-            os.remove(settings.game_db)
-            logging.info("Cleaned up test database: %s", settings.game_db)
+        db_path = backend_module.app.config.get("DATABASE", settings.game_db)
+        for suffix in ["", "-shm", "-wal"]:
+            f = db_path + suffix
+            if os.path.exists(f):
+                os.remove(f)
+                logging.info("Cleaned up test database file: %s", f)
     except OSError as exc:
         logging.warning("Failed to remove test db: %s", exc)
 
@@ -151,30 +160,8 @@ def client(app: Flask) -> Generator[Any, None, None]:
 # 登录态 headers
 # ============================================================================
 @pytest.fixture
-def logged_headers(client: Any) -> dict[str, str]:
-    resp = client.post(
-        "/api/login",
-        json={"username": "player1", "password": "123"},
-    )
-    assert resp.status_code == 200, f"登录失败: {resp.get_json()}"
-    token: str = resp.get_json()["token"]
-    return {"Authorization": f"Bearer {token}"}
-
-
-@pytest.fixture
-def logged_headers_player2(client: Any) -> dict[str, str]:
-    resp = client.post(
-        "/api/login",
-        json={"username": "player2", "password": "123"},
-    )
-    assert resp.status_code == 200
-    token: str = resp.get_json()["token"]
-    return {"Authorization": f"Bearer {token}"}
-
-
-@pytest.fixture
 def auth_headers(client: Any) -> Callable[[str, str], dict[str, str]]:
-    """动态登录任意用户"""
+    """动态登录任意用户（通过 /api/login 获取 token）"""
 
     def _login(username: str, password: str = "123") -> dict[str, str]:
         resp = client.post(
@@ -186,6 +173,18 @@ def auth_headers(client: Any) -> Callable[[str, str], dict[str, str]]:
         return {"Authorization": f"Bearer {token}"}
 
     return _login
+
+
+@pytest.fixture
+def logged_headers(auth_headers) -> dict[str, str]:
+    """默认登录 player1"""
+    return auth_headers("player1", "123")
+
+
+@pytest.fixture
+def logged_headers_player2(auth_headers) -> dict[str, str]:
+    """登录 player2"""
+    return auth_headers("player2", "123")
 
 
 @pytest.fixture
@@ -253,7 +252,7 @@ def base_url(app: Flask) -> Generator[str, None, None]:
 
 
 # ============================================================================
-# Playwright 浏览器 Fixture（增强 Trace 录制）
+# Playwright 浏览器 Fixture
 # ============================================================================
 @pytest.fixture(scope="session")
 def browser(request: pytest.FixtureRequest) -> Generator[Browser, None, None]:
@@ -278,33 +277,31 @@ def pytest_runtest_makereport(
 
 @pytest.fixture
 def page(
-        browser: Browser, base_url: str, request: pytest.FixtureRequest
+    browser: Browser, base_url: str, request: pytest.FixtureRequest
 ) -> Generator[Page, None, None]:
-    # 1. 创建上下文（只保留正确的参数）
     context = browser.new_context(
+        base_url=base_url,
         viewport={"width": 1280, "height": 720},
-        record_video_dir="videos/",
+        record_video_dir="videos/" if settings.headless else None,
     )
 
-    # 2. 开启 Trace 录制（截图 + DOM快照 + 网络 + 控制台）
-    context.tracing.start(screenshots=True, snapshots=True, sources=True)
+    if settings.trace:
+        context.tracing.start(screenshots=True, snapshots=True, sources=True)
 
     pg = context.new_page()
     yield pg
 
-    # 3. 判断用例是否失败
     failed = False
     if hasattr(request.node, "rep_call"):
         failed = request.node.rep_call.failed
 
-    # 4. 保存 Trace 文件
     trace_dir = Path("test-results") / request.node.name.replace(":", "_")
     trace_dir.mkdir(parents=True, exist_ok=True)
     trace_path = trace_dir / "trace.zip"
 
-    context.tracing.stop(path=str(trace_path))
+    if settings.trace:
+        context.tracing.stop(path=str(trace_path))
 
-    # 5. 失败时截图 + 附加 Trace 到 Allure
     if failed:
         try:
             allure.attach(
@@ -326,16 +323,20 @@ def page(
             pass
 
     context.close()
+
+
 # ============================================================================
 # Allure 环境信息
 # ============================================================================
 def pytest_sessionstart(session: pytest.Session) -> None:
-    env_file = Path(settings.game_db).parent / "environment.properties"
-    env_file.parent.mkdir(parents=True, exist_ok=True)
+    allure_results_dir = Path("allure-results")
+    allure_results_dir.mkdir(parents=True, exist_ok=True)
+    env_file = allure_results_dir / "environment.properties"
     env_file.write_text(
         f"GameDB={settings.game_db}\n"
         f"Browser={settings.browser_type}\n"
         f"Headless={settings.headless}\n"
+        f"Trace={settings.trace}\n"
         f"TestEnv={settings.test_env}\n"
         f"CI={os.environ.get('CI', 'false')}\n",
         encoding="utf-8",
@@ -348,12 +349,10 @@ def pytest_sessionstart(session: pytest.Session) -> None:
 @pytest.fixture
 def shop_api(client: Any, logged_headers: dict[str, str]) -> Any:
     from tests.api.shop_api import ShopAPI
-
     return ShopAPI(client, logged_headers)
 
 
 @pytest.fixture
-def shop_page(page: Page, base_url: str) -> Any:
+def shop_page(page: Page) -> Any:
     from tests.pages.shop_page import ShopPage
-
-    return ShopPage(page, base_url)
+    return ShopPage(page)

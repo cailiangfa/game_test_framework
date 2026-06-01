@@ -27,12 +27,57 @@
     "tags": ["positive"]
   },
   {
-    "id": "buy_2x5",
+    "id": "buy_2x5_exact",
     "item_id": 2,
     "quantity": 5,
     "expected_gold_delta": -1000,
     "expected_bp_delta": 5,
     "description": "购买5瓶魔法药水（刚好花光金币）",
     "tags": ["positive", "boundary"]
+  },
+  {
+    "id": "buy_1x10_exact",
+    "item_id": 1,
+    "quantity": 10,
+    "expected_gold_delta": -1000,
+    "expected_bp_delta": 10,
+    "description": "购买10瓶生命药水（刚好花光金币，边界：余额=总价）",
+    "tags": ["positive", "boundary"]
+  },
+  {
+    "id": "buy_1x11_insufficient",
+    "item_id": 1,
+    "quantity": 11,
+    "expected_status": 400,
+    "expected_error_keyword": "余额不足",
+    "description": "购买11瓶生命药水需要1100，但只有1000",
+    "tags": ["negative", "boundary"]
+  },
+  {
+    "id": "buy_999x1_not_exist",
+    "item_id": 999,
+    "quantity": 1,
+    "expected_status": 400,
+    "expected_error_keyword": "不存在",
+    "description": "购买不存在的道具item_id=999",
+    "tags": ["negative"]
+  },
+  {
+    "id": "buy_1x0_invalid",
+    "item_id": 1,
+    "quantity": 0,
+    "expected_status": 400,
+    "expected_error_keyword": "正整数",
+    "description": "购买数量为0（参数校验）",
+    "tags": ["negative", "validation"]
+  },
+  {
+    "id": "buy_1x_neg5_invalid",
+    "item_id": 1,
+    "quantity": -5,
+    "expected_status": 400,
+    "expected_error_keyword": "正整数",
+    "description": "购买数量为负数（参数校验）",
+    "tags": ["negative", "validation"]
   }
 ]

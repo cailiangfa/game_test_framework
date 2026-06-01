@@ -1,11 +1,15 @@
 """
+#tests/performance/config.py
 性能测试基线配置
 """
 
+"""
+性能测试基线配置
+"""
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True)
@@ -13,14 +17,14 @@ class PerformanceBaseline:
     """
     性能基线
 
-    注意：SQLite + Flask 单线程模式下，不要设太高的并发期望。
+    注意：SQLite + Flask 开发服务器模式下，不要设太高的并发期望。
     这里的基线是为了"发现回归"，不是"对标生产数据库"。
+    如需真实压测，请换 Gunicorn + PostgreSQL/MySQL。
     """
 
     # 响应时间（SQLite 本地文件，预期较快）
-    p95_ms: int = 300  # SQLite 合理上限
-    max_ms: int = 2000  # 容忍偶尔锁等待
-    error_rate_pct: float = 1.0
+    p95_ms: int = 300
+    max_ms: int = 2000
 
     # 吞吐量（SQLite 写锁限制，单节点很难超过 50 RPS）
     rps_min: int = 20
@@ -28,7 +32,7 @@ class PerformanceBaseline:
 
     # 错误率
     error_rate_pct: float = 1.0
-    business_reject_rate_pct: float = 15.0  # 余额不足/道具不足，业务允许
+    business_reject_rate_pct: float = 15.0
 
     # 并发（SQLite 建议不超过 50 并发写）
     concurrent_users: int = 50
@@ -40,16 +44,14 @@ class PerformanceBaseline:
     memory_pct_max: float = 85.0
 
 
-@dataclass(frozen=True)
+# ★ 改动：去掉 frozen，用 field(default_factory=...)
+@dataclass
 class StepLoadProfile:
     """阶梯加压：适配 SQLite 的保守策略"""
 
-    steps: list[tuple[int, int]] = None
-
-    def __post_init__(self):
-        if self.steps is None:
-            # 保守阶梯：5→20→50，观察拐点
-            object.__setattr__(self, "steps", [(5, 60), (20, 60), (50, 120)])
+    steps: list[tuple[int, int]] = field(
+        default_factory=lambda: [(5, 60), (20, 60), (50, 120)]
+    )
 
 
 def get_baseline(env: str | None = None) -> PerformanceBaseline:

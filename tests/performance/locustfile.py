@@ -1,12 +1,13 @@
 """
 tests/performance/locustfile.py
-性能测试最终版：自动启动后端 + 修复 Locust 2.x API
+性能测试最终版：每个虚拟用户注册独立账号
 """
 from __future__ import annotations
 
 import subprocess
 import sys
 import time
+import uuid
 from pathlib import Path
 
 from locust import HttpUser, between, events, task
@@ -18,7 +19,6 @@ _backend_process = None
 @events.init.add_listener
 def on_locust_init(environment, **kwargs):
     global _backend_process
-    # 检查后端是否已在运行
     import urllib.request
     try:
         urllib.request.urlopen("http://127.0.0.1:5000/", timeout=1)
@@ -32,7 +32,6 @@ def on_locust_init(environment, **kwargs):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        # 等待后端启动
         for _ in range(30):
             time.sleep(0.5)
             try:
@@ -57,10 +56,15 @@ class GameShopUser(HttpUser):
     host = "http://127.0.0.1:5000"
 
     def on_start(self):
-        """每个用户开始时登录"""
+        """★ 改动：每个用户注册独立账号，避免共享 player1 导致余额不足"""
+        username = f"perf_{uuid.uuid4().hex[:8]}"
+        self.client.post(
+            "/api/register",
+            json={"username": username, "password": "123"},
+        )
         with self.client.post(
             "/api/login",
-            json={"username": "player1", "password": "123"},
+            json={"username": username, "password": "123"},
             catch_response=True,
         ) as resp:
             if resp.status_code == 200:
@@ -79,6 +83,9 @@ class GameShopUser(HttpUser):
             catch_response=True,
         ) as resp:
             if resp.status_code == 200:
+                resp.success()
+            elif resp.status_code == 400:
+                # 余额不足是业务预期，不算错误
                 resp.success()
             else:
                 resp.failure(f"购买失败: {resp.status_code} - {resp.text}")
